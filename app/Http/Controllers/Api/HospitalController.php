@@ -80,6 +80,19 @@ class HospitalController extends Controller
     }
 
     /**
+     * Daftar semua dokter dari semua RS
+     */
+    public function allDoctors(): JsonResponse
+    {
+        $doctors = \App\Models\Doctor::with('hospital')
+            ->where('availability', 'available')
+            ->orderBy('name')
+            ->get();
+
+        return response()->json(['success' => true, 'data' => $doctors]);
+    }
+
+    /**
      * Admin: tambah RS baru
      */
     public function store(Request $request): JsonResponse

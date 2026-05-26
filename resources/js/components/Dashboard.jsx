@@ -8,6 +8,8 @@ import DaftarRS from "./DaftarRS";
 import PendaftaranRS from "./PendaftaranRS";
 import Riwayat from "./Riwayat";
 import KalenderPengingat from "./KalenderPengingat";
+import Konsultasi from "./Konsultasi";
+import ReminderPopup from "./ReminderPopup";
 import axios from "axios";
 import {
   Menu,
@@ -53,6 +55,7 @@ export default function Home({ user, profile, onLogout }) {
   // ── Home Dashboard Data ──────────────────────────────────────────────
   const [dashboardData, setDashboardData] = useState(null);
   const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [reminderBadge, setReminderBadge] = useState(0);
 
   useEffect(() => {
     if (user?.id) fetchDashboardData();
@@ -73,6 +76,37 @@ export default function Home({ user, profile, onLogout }) {
       setDashboardLoading(false);
     }
   };
+
+  const fetchReminderBadge = async () => {
+    const userId = user?.id;
+    if (!userId) {
+      setReminderBadge(0);
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("mefasafe_token") || localStorage.getItem("token");
+      const res = await axios.get(`http://127.0.0.1:8000/api/v1/reminders/today`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { user_id: userId },
+      });
+
+      if (res.data.success) {
+        setReminderBadge(Array.isArray(res.data.data) ? res.data.data.length : 0);
+      }
+    } catch (error) {
+      console.error("Reminder badge fetch error:", error);
+      setReminderBadge(0);
+    }
+  };
+
+  useEffect(() => {
+    fetchReminderBadge();
+
+    const intervalId = window.setInterval(fetchReminderBadge, 60000);
+
+    return () => window.clearInterval(intervalId);
+  }, [user?.id]);
 
   // Helper: format rupiah
   const formatRupiah = (num) =>
@@ -134,6 +168,7 @@ export default function Home({ user, profile, onLogout }) {
       gradient: "from-orange-500 via-orange-600 to-amber-600",
       color: "orange",
       description: "Atur jadwal kontrol",
+      badge: reminderBadge,
     },
     {
       icon: <MessageSquare className="w-7 h-7" />,
@@ -179,7 +214,7 @@ export default function Home({ user, profile, onLogout }) {
 
   const sidebarMenu = [
     { icon: <HomeIcon className="w-5 h-5" />, label: "Home", onClick: () => navigate("/home") },
-    { icon: <Bell className="w-5 h-5" />, label: "Notifikasi", onClick: () => navigate("/notifikasi"), badge: 0 },
+    { icon: <Bell className="w-5 h-5" />, label: "Notifikasi", onClick: () => navigate("/notifikasi") },
     { icon: <MessageSquare className="w-5 h-5" />, label: "ChatBot", onClick: () => navigate("/chatbot") },
   ];
 
@@ -366,6 +401,7 @@ export default function Home({ user, profile, onLogout }) {
       </header>
 
       <main className={`relative z-10 ${isChatBot ? "p-0" : "px-4 md:px-6 py-8"}`}>
+        <ReminderPopup userId={user?.id} />
         <Routes>
           <Route path="/home" element={
             <div className="max-w-7xl mx-auto space-y-8">
@@ -579,13 +615,18 @@ export default function Home({ user, profile, onLogout }) {
                             {item.icon}
                           </div>
                           <div className={`absolute inset-0 w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br ${item.gradient} opacity-0 group-hover:opacity-50 blur-xl transition-opacity duration-500`}></div>
+                          {item.badge && item.badge > 0 && (
+                            <span className="absolute -top-2 -right-2 min-w-6 h-6 px-1.5 bg-gradient-to-r from-red-500 to-pink-500 text-white text-[11px] font-bold rounded-full flex items-center justify-center shadow-lg animate-bounce">
+                              {item.badge}
+                            </span>
+                          )}
                         </div>
 
                         {/* Label */}
                         <p className="text-sm font-bold text-gray-900 text-center leading-snug mb-1 group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 group-hover:bg-clip-text transition-all duration-300">
                           {item.label}
                         </p>
-                        
+
                         {/* Description */}
                         <p className="text-xs text-gray-500 text-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                           {item.description}
@@ -644,6 +685,7 @@ export default function Home({ user, profile, onLogout }) {
           <Route path="/daftar-rs/:id" element={<PendaftaranRS user={user} />} />
           <Route path="/riwayat" element={<Riwayat user={user} />} />
           <Route path="/kalender" element={<KalenderPengingat user={user} />} />
+          <Route path="/konsul" element={<Konsultasi user={user} />} />
           
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>

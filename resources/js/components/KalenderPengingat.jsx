@@ -162,8 +162,6 @@ export default function KalenderPengingat({ user }) {
   const [reminders,  setReminders]  = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [modal,      setModal]      = useState(null); // null | {} | reminder obj
-  const [todayAlert, setTodayAlert] = useState([]);
-  const [alertDismissed, setAlertDismissed] = useState(false);
 
   /* ── fetch semua reminder ── */
   const fetchReminders = useCallback(async () => {
@@ -182,25 +180,9 @@ export default function KalenderPengingat({ user }) {
     }
   }, [user]);
 
-  /* ── fetch reminder hari ini untuk alert ── */
-  const fetchTodayAlert = useCallback(async () => {
-    try {
-      const token = localStorage.getItem("mefasafe_token");
-      const userId = user?.id;
-      const res = await axios.get(`${API}/reminders/today`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { user_id: userId },
-      });
-      if (res.data.success && res.data.data.length > 0) {
-        setTodayAlert(res.data.data);
-      }
-    } catch (e) { /* silent */ }
-  }, [user]);
-
   useEffect(() => {
     fetchReminders();
-    fetchTodayAlert();
-  }, [fetchReminders, fetchTodayAlert]);
+  }, [fetchReminders]);
 
   /* ── helpers kalender ── */
   const year  = viewDate.getFullYear();
@@ -250,7 +232,6 @@ export default function KalenderPengingat({ user }) {
   const onModalSave = () => {
     setModal(null);
     fetchReminders();
-    fetchTodayAlert();
   };
 
   return (
@@ -279,35 +260,6 @@ export default function KalenderPengingat({ user }) {
             <span className="hidden sm:inline">Tambah</span>
           </button>
         </div>
-
-        {/* Alert: reminder hari ini */}
-        {!alertDismissed && todayAlert.length > 0 && (
-          <div className="relative rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 p-4 text-white shadow-xl overflow-hidden">
-            <div className="absolute inset-0 bg-white/10 backdrop-blur-sm" />
-            <div className="relative flex items-start gap-3">
-              <div className="p-2 bg-white/20 rounded-xl shrink-0">
-                <Bell className="w-5 h-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-sm">🔔 {todayAlert.length} Pengingat Hari Ini</p>
-                <ul className="mt-1 space-y-0.5">
-                  {todayAlert.slice(0, 3).map(r => (
-                    <li key={r.id} className="text-xs text-white/90 truncate">
-                      • {r.title}{r.reminder_time ? ` — ${r.reminder_time.slice(0,5)}` : ""}
-                    </li>
-                  ))}
-                  {todayAlert.length > 3 && (
-                    <li className="text-xs text-white/80">+{todayAlert.length - 3} lainnya</li>
-                  )}
-                </ul>
-              </div>
-              <button onClick={() => setAlertDismissed(true)}
-                className="p-1.5 rounded-lg bg-white/20 hover:bg-white/30 transition-colors shrink-0">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
           {/* ── Kalender ── */}

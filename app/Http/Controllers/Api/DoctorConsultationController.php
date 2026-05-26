@@ -86,4 +86,31 @@ class DoctorConsultationController extends Controller
             'message' => 'Doctor consultation deleted successfully.',
         ], 200);
     }
+
+    public function getMessages(string $id): JsonResponse
+    {
+        $doctorConsultation = DoctorConsultation::findOrFail($id);
+        
+        return response()->json([
+            'message' => 'Messages retrieved successfully.',
+            'data' => $doctorConsultation->messages()->oldest()->get(),
+        ], 200);
+    }
+
+    public function sendMessage(Request $request, string $id): JsonResponse
+    {
+        $doctorConsultation = DoctorConsultation::findOrFail($id);
+
+        $validated = $request->validate([
+            'sender' => ['required', 'in:user,admin'],
+            'message' => ['required', 'string'],
+        ]);
+
+        $message = $doctorConsultation->messages()->create($validated);
+
+        return response()->json([
+            'message' => 'Message sent successfully.',
+            'data' => $message,
+        ], 201);
+    }
 }

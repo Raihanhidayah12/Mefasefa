@@ -26,6 +26,8 @@ Route::prefix('v1')->group(function (): void {
     Route::apiResource('transactions', TransactionController::class);
     Route::apiResource('hospital-registrations', HospitalRegistrationController::class);
     Route::apiResource('doctor-consultations', DoctorConsultationController::class);
+    Route::get('/doctor-consultations/{id}/messages', [DoctorConsultationController::class, 'getMessages']);
+    Route::post('/doctor-consultations/{id}/messages', [DoctorConsultationController::class, 'sendMessage']);
     Route::apiResource('feedbacks', FeedbackController::class);
     Route::get('/user-insurance', [InsurancePolicyController::class, 'index']);
     Route::get('/claims/status', [ClaimController::class, 'index']);
@@ -63,4 +65,5 @@ Route::prefix('v1')->group(function (): void {
     Route::post('/hospitals', [HospitalController::class, 'store']);
     Route::put('/hospitals/{id}', [HospitalController::class, 'update']);
     Route::delete('/hospitals/{id}', [HospitalController::class, 'destroy']);
+    Route::get('/doctors', [HospitalController::class, 'allDoctors']);
 });

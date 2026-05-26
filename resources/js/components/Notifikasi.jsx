@@ -1,6 +1,6 @@
-import { useNavigate } from "react-router-dom";
+
 import { useState, useEffect } from "react";
-import { ArrowLeft, BellRing, CheckCircle2, Clock3, ShieldCheck, Sparkles } from "lucide-react";
+import { BellRing, CheckCircle2, Clock3, ShieldCheck } from "lucide-react";
 import axios from "axios";
 
 import surat from "../../../assets/surat.png";
@@ -9,7 +9,6 @@ import toa from "../../../assets/toa.png";
 import kertas from "../../../assets/kertas.png";
 
 function Notification() {
-  const navigate = useNavigate();
   const [data, setData] = useState([]);
   const [summary, setSummary] = useState({
     today_notifications: 0,
@@ -39,7 +38,7 @@ function Notification() {
 
   const fetchNotifications = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("mefasafe_token") || localStorage.getItem("token");
       const response = await axios.get("http://127.0.0.1:8000/api/v1/notifications", {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -57,7 +56,7 @@ function Notification() {
 
   const fetchSummary = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("mefasafe_token") || localStorage.getItem("token");
       const response = await axios.get("http://127.0.0.1:8000/api/v1/notifications/summary", {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -76,6 +75,7 @@ function Notification() {
     { label: "Sudah diverifikasi", value: summary.verified_count.toString(), icon: ShieldCheck, color: "text-emerald-600" },
     { label: "Butuh perhatian", value: summary.needs_attention_count.toString(), icon: Clock3, color: "text-amber-600" },
   ];
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-50/70 relative overflow-hidden animate-fadeIn">
