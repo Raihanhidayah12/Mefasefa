@@ -354,7 +354,7 @@ http://127.0.0.1:8000/api
 - ✅ Data layanan kesehatan dinamis dari database
 
 ### v2.0.0 · UAS (Mei 2026)
-- ✅ Full-stack implementation (Laravel 11 + React 19)
+- ✅ Full-stack implementation (Laravel 13 + React 19)
 - ✅ Autentikasi dengan Laravel Sanctum
 - ✅ Dashboard dengan data real-time
 - ✅ Manajemen polis, klaim, dan transaksi
