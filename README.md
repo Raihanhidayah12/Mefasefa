@@ -106,7 +106,7 @@ Dibangun menggunakan **Laravel 11** sebagai backend REST API dan **React 19** se
 
 | Lapisan | Teknologi |
 |---------|-----------|
-| **Backend** | Laravel 11, PHP 8.2+, Laravel Sanctum |
+| **Backend** | Laravel 13, PHP 8.2+, Laravel Sanctum |
 | **Frontend** | React 19, React Router DOM v7, Axios |
 | **Build Tool** | Vite 8 |
 | **Styling** | Tailwind CSS (utility-first) |
