@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import axios from "axios";
 import { 
     Stethoscope, Calendar, Clock, Video, MessageSquare, 
@@ -34,7 +35,6 @@ export default function Konsultasi({ user }) {
                     rating: 4.8 + (Math.random() * 0.2), // Mock rating since DB doesn't have it
                     exp: Math.floor(Math.random() * 15 + 5) + " Tahun", // Mock experience
                     status: doc.availability === "available" ? "Tersedia" : "Sibuk",
-                    image: doc.photo || `https://i.pravatar.cc/150?u=${doc.id}`,
                     originalData: doc
                 }));
                 setDoctors(formattedDoctors);
@@ -343,7 +343,10 @@ export default function Konsultasi({ user }) {
                                 <div key={doc.id} className="bg-white rounded-3xl p-6 border border-gray-100 shadow-md hover:shadow-xl transition-all duration-500 group">
                                     <div className="flex items-start gap-4 mb-6">
                                         <div className="relative">
-                                            <img src={doc.image} alt={doc.name} className="w-20 h-20 rounded-2xl object-cover shadow-inner group-hover:scale-105 transition-transform duration-500" />
+                                            <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-inner group-hover:scale-105 transition-transform duration-500"
+                                                style={{ background: `hsl(${(doc.name.charCodeAt(3) || 200) * 5 % 360}, 65%, 50%)` }}>
+                                                {doc.name.split(' ').slice(1, 3).map(w => w[0]).join('').toUpperCase() || doc.name.substring(0, 2).toUpperCase()}
+                                            </div>
                                             <div className={`absolute -bottom-2 -right-2 w-6 h-6 rounded-full border-2 border-white flex items-center justify-center ${doc.status === 'Tersedia' ? 'bg-green-500' : 'bg-amber-500'}`}>
                                                 {doc.status === 'Tersedia' && <CheckCircle2 className="w-3 h-3 text-white" />}
                                             </div>
@@ -469,9 +472,9 @@ export default function Konsultasi({ user }) {
                 )}
             </div>
 
-            {/* Booking Modal Overlay */}
-            {selectedDoctor && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            {/* Booking Modal Overlay - Portal ke document.body */}
+            {selectedDoctor && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
                     <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
                         <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-6 text-white text-center">
                             <h3 className="text-xl font-bold">Konfirmasi Konsultasi</h3>
@@ -479,7 +482,10 @@ export default function Konsultasi({ user }) {
                         </div>
                         <div className="p-6">
                             <div className="flex items-center gap-4 mb-6 p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                                <img src={selectedDoctor.image} alt={selectedDoctor.name} className="w-16 h-16 rounded-xl object-cover shadow-sm" />
+                                <div className="w-16 h-16 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-sm flex-shrink-0"
+                                    style={{ background: `hsl(${(selectedDoctor.name.charCodeAt(3) || 200) * 5 % 360}, 65%, 50%)` }}>
+                                    {selectedDoctor.name.split(' ').slice(1, 3).map(w => w[0]).join('').toUpperCase() || selectedDoctor.name.substring(0, 2).toUpperCase()}
+                                </div>
                                 <div>
                                     <h4 className="font-bold text-gray-900">{selectedDoctor.name}</h4>
                                     <p className="text-purple-600 text-sm">{selectedDoctor.specialist}</p>
@@ -523,12 +529,13 @@ export default function Konsultasi({ user }) {
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
-            {/* Delete Confirmation Modal */}
-            {deleteTarget && (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            {/* Delete Confirmation Modal - Portal ke document.body */}
+            {deleteTarget && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
                     <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden">
                         <div className="bg-gradient-to-r from-red-500 to-rose-600 p-6 text-white text-center">
                             <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -568,7 +575,8 @@ export default function Konsultasi({ user }) {
                             </div>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </>
     );

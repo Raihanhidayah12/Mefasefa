@@ -14,65 +14,38 @@ import {
   BadgeCheck,
 } from "lucide-react";
 
-// ── Paket polis yang tersedia ────────────────────────────────────────────────
-const POLIS_PACKAGES = [
-  {
-    type: "jiwa",
-    label: "Asuransi Jiwa",
+const PACKAGE_STYLES = {
+  jiwa: {
     icon: Heart,
     gradient: "from-rose-500 to-pink-600",
     bgLight: "bg-rose-50",
     borderActive: "border-rose-400",
     textColor: "text-rose-600",
-    description: "Perlindungan jiwa untuk ketenangan keluarga Anda",
-    coverage_limit: 500000000,
-    premium_amount: 750000,
-    benefits: [
-      "Santunan meninggal dunia hingga Rp 500 juta",
-      "Santunan cacat tetap total",
-      "Bebas premi jika cacat",
-      "Nilai tunai setelah 2 tahun",
-    ],
   },
-  {
-    type: "kesehatan",
-    label: "Asuransi Kesehatan",
+  kesehatan: {
     icon: Shield,
     gradient: "from-blue-500 to-indigo-600",
     bgLight: "bg-blue-50",
     borderActive: "border-blue-400",
     textColor: "text-blue-600",
-    description: "Rawat inap, rawat jalan, dan obat-obatan ditanggung",
-    coverage_limit: 100000000,
-    premium_amount: 500000,
-    benefits: [
-      "Rawat inap hingga Rp 100 juta/tahun",
-      "Rawat jalan 80% ditanggung",
-      "Obat sesuai resep dokter",
-      "500+ rumah sakit rekanan",
-    ],
   },
-  {
-    type: "kendaraan",
-    label: "Asuransi Kendaraan",
+  kendaraan: {
     icon: Car,
     gradient: "from-emerald-500 to-teal-600",
     bgLight: "bg-emerald-50",
     borderActive: "border-emerald-400",
     textColor: "text-emerald-600",
-    description: "Lindungi kendaraan dari risiko kecelakaan & kehilangan",
-    coverage_limit: 200000000,
-    premium_amount: 300000,
-    benefits: [
-      "Ganti rugi kecelakaan hingga Rp 200 juta",
-      "Kehilangan akibat pencurian",
-      "Tanggung jawab pihak ketiga",
-      "Layanan derek 24 jam",
-    ],
   },
+};
+
+const PAYMENT_METHODS = [
+  "Transfer Bank",
+  "GoPay / OVO",
+  "Dana / ShopeePay",
+  "Alfamart / Indomaret",
 ];
 
-// ── Step indicator ───────────────────────────────────────────────────────────
+// ── Step indicator ───────────────────────────────────────────────────────────────
 function StepIndicator({ step }) {
   const steps = ["Pilih Polis", "Isi Data", "Konfirmasi", "Selesai"];
   return (
@@ -122,11 +95,16 @@ export default function HealthService({ user }) {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [selectedPolis, setSelectedPolis] = useState(null);
+  const [packages, setPackages] = useState([]);
   const [existingPolicies, setExistingPolicies] = useState([]);
   const [loadingPolicies, setLoadingPolicies] = useState(true);
+  const [loadingPackages, setLoadingPackages] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [successData, setSuccessData] = useState(null);
   const [error, setError] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [paymentProof, setPaymentProof] = useState(null);
+  const [paymentProofName, setPaymentProofName] = useState("");
 
   const [form, setForm] = useState({
     insured_name: user?.name || "",
@@ -135,6 +113,23 @@ export default function HealthService({ user }) {
   });
 
   const token = localStorage.getItem("mefasafe_token");
+
+  // Fetch paket polis dari database
+  useEffect(() => {
+    const fetchPackages = async () => {
+      try {
+        const res = await axios.get("http://127.0.0.1:8000/api/v1/insurance-packages", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setPackages(res.data.data || []);
+      } catch {
+        setPackages([]);
+      } finally {
+        setLoadingPackages(false);
+      }
+    };
+    fetchPackages();
+  }, []);
 
   // Fetch polis yang sudah dimiliki user
   useEffect(() => {
@@ -165,6 +160,8 @@ export default function HealthService({ user }) {
     return `${prefix}-${ts}-${rand}`;
   };
 
+  const getPackageStyle = (pkg) => PACKAGE_STYLES[pkg.type] || PACKAGE_STYLES.kesehatan;
+
   // ── Step 1: Pilih Polis ──────────────────────────────────────────────────
   const handleSelectPolis = (pkg) => {
     if (hasType(pkg.type)) return; // sudah punya, skip
@@ -187,25 +184,47 @@ export default function HealthService({ user }) {
     setStep(3);
   };
 
+  const handlePaymentProofChange = (event) => {
+    const file = event.target.files?.[0] ?? null;
+    setPaymentProof(file);
+    setPaymentProofName(file ? file.name : "");
+  };
+
   // ── Step 3: Konfirmasi & Submit ──────────────────────────────────────────
   const handleSubmit = async () => {
     setSubmitting(true);
     setError("");
-    try {
-      const payload = {
-        user_id: user?.id,
-        policy_number: generatePolicyNumber(selectedPolis.type),
-        insurance_type: selectedPolis.type,
-        insured_name: form.insured_name,
-        premium_amount: selectedPolis.premium_amount,
-        coverage_limit: selectedPolis.coverage_limit,
-        start_date: form.start_date,
-        end_date: form.end_date,
-        status: "active",
-      };
 
-      const res = await axios.post("http://127.0.0.1:8000/api/v1/insurance-policies", payload, {
-        headers: { Authorization: `Bearer ${token}` },
+    if (!paymentMethod) {
+      setError("Harap pilih metode pembayaran.");
+      setSubmitting(false);
+      return;
+    }
+    if (!paymentProof) {
+      setError("Harap unggah bukti pembayaran.");
+      setSubmitting(false);
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append("user_id", user?.id);
+      formData.append("policy_number", generatePolicyNumber(selectedPolis.type));
+      formData.append("insurance_type", selectedPolis.type);
+      formData.append("insured_name", form.insured_name);
+      formData.append("premium_amount", selectedPolis.premium_amount);
+      formData.append("coverage_limit", selectedPolis.coverage_limit);
+      formData.append("start_date", form.start_date);
+      formData.append("end_date", form.end_date);
+      formData.append("status", "inactive");
+      formData.append("payment_method", paymentMethod);
+      formData.append("payment_proof", paymentProof);
+
+      const res = await axios.post("http://127.0.0.1:8000/api/v1/insurance-policies", formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
+        },
       });
 
       setSuccessData(res.data.data);
@@ -250,14 +269,15 @@ export default function HealthService({ user }) {
           <div className="space-y-4">
             <h2 className="text-xl font-bold text-slate-800 mb-4">Pilih Jenis Polis</h2>
 
-            {loadingPolicies ? (
+            {loadingPackages ? (
               <div className="flex justify-center py-12">
                 <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                {POLIS_PACKAGES.map((pkg) => {
-                  const Icon = pkg.icon;
+                {packages.map((pkg) => {
+                  const style = getPackageStyle(pkg);
+                  const Icon = style.icon;
                   const owned = hasType(pkg.type);
                   return (
                     <button
@@ -267,7 +287,7 @@ export default function HealthService({ user }) {
                       className={`relative rounded-[24px] border-2 p-6 text-left transition-all duration-300 shadow-md group ${
                         owned
                           ? "border-green-300 bg-green-50/80 cursor-not-allowed opacity-80"
-                          : `border-slate-200 bg-white/90 hover:${pkg.borderActive} hover:shadow-xl hover:-translate-y-1 cursor-pointer`
+                          : `border-slate-200 bg-white/90 hover:${style.borderActive} hover:shadow-xl hover:-translate-y-1 cursor-pointer`
                       }`}
                     >
                       {owned && (
@@ -277,21 +297,21 @@ export default function HealthService({ user }) {
                         </div>
                       )}
 
-                      <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${pkg.gradient} flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                      <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${style.gradient} flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
                         <Icon className="w-7 h-7 text-white" />
                       </div>
 
                       <h3 className="text-lg font-black text-slate-900 mb-1">{pkg.label}</h3>
                       <p className="text-xs text-slate-500 mb-4 leading-relaxed">{pkg.description}</p>
 
-                      <div className={`text-xs font-semibold ${pkg.textColor} mb-3`}>
+                      <div className={`text-xs font-semibold ${style.textColor} mb-3`}>
                         Coverage: {formatRupiah(pkg.coverage_limit)}
                       </div>
 
                       <ul className="space-y-1.5 mb-5">
                         {pkg.benefits.map((b) => (
                           <li key={b} className="flex items-start gap-2 text-xs text-slate-600">
-                            <CheckCircle2 className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${pkg.textColor}`} />
+                            <CheckCircle2 className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${style.textColor}`} />
                             {b}
                           </li>
                         ))}
@@ -299,11 +319,11 @@ export default function HealthService({ user }) {
 
                       <div className="border-t border-slate-100 pt-4">
                         <p className="text-[11px] text-slate-400 uppercase tracking-wider mb-1">Premi / bulan</p>
-                        <p className={`text-xl font-black ${pkg.textColor}`}>{formatRupiah(pkg.premium_amount)}</p>
+                        <p className={`text-xl font-black ${style.textColor}`}>{formatRupiah(pkg.premium_amount)}</p>
                       </div>
 
                       {!owned && (
-                        <div className={`mt-4 w-full py-2.5 rounded-xl bg-gradient-to-r ${pkg.gradient} text-white text-sm font-bold text-center flex items-center justify-center gap-2 group-hover:shadow-lg transition-all duration-300`}>
+                        <div className={`mt-4 w-full py-2.5 rounded-xl bg-gradient-to-r ${style.gradient} text-white text-sm font-bold text-center flex items-center justify-center gap-2 group-hover:shadow-lg transition-all duration-300`}>
                           Pilih Polis
                           <ChevronRight className="w-4 h-4" />
                         </div>
@@ -319,9 +339,12 @@ export default function HealthService({ user }) {
         {/* ── STEP 2: Isi Data ── */}
         {step === 2 && selectedPolis && (
           <div className="max-w-xl mx-auto">
-            <div className={`rounded-2xl bg-gradient-to-r ${selectedPolis.gradient} p-4 text-white mb-6 flex items-center gap-4`}>
+            <div className={`rounded-2xl bg-gradient-to-r ${getPackageStyle(selectedPolis).gradient} p-4 text-white mb-6 flex items-center gap-4`}>
               <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
-                <selectedPolis.icon className="w-6 h-6 text-white" />
+                {(() => {
+                  const Icon = getPackageStyle(selectedPolis).icon;
+                  return <Icon className="w-6 h-6 text-white" />;
+                })()}
               </div>
               <div>
                 <p className="text-xs font-semibold opacity-80 uppercase tracking-wider">Polis Dipilih</p>
@@ -380,7 +403,7 @@ export default function HealthService({ user }) {
 
               <button
                 type="submit"
-                className={`w-full py-3.5 rounded-xl bg-gradient-to-r ${selectedPolis.gradient} text-white font-bold text-sm flex items-center justify-center gap-2 hover:shadow-lg hover:scale-[1.02] transition-all duration-300`}
+                className={`w-full py-3.5 rounded-xl bg-gradient-to-r ${getPackageStyle(selectedPolis).gradient} text-white font-bold text-sm flex items-center justify-center gap-2 hover:shadow-lg hover:scale-[1.02] transition-all duration-300`}
               >
                 Lanjut ke Konfirmasi
                 <ChevronRight className="w-4 h-4" />
@@ -425,13 +448,38 @@ export default function HealthService({ user }) {
               <div>
                 <p className="text-sm font-semibold text-slate-700 mb-3">Metode Pembayaran</p>
                 <div className="grid grid-cols-2 gap-2">
-                  {["Transfer Bank", "GoPay / OVO", "Dana / ShopeePay", "Alfamart / Indomaret"].map((m) => (
-                    <div key={m} className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-600">
-                      <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                  {PAYMENT_METHODS.map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setPaymentMethod(m)}
+                      className={`w-full text-left px-3 py-2.5 rounded-xl border transition-all text-xs font-medium ${
+                        paymentMethod === m
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-slate-50'
+                      }`}
+                    >
                       {m}
-                    </div>
+                    </button>
                   ))}
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Bukti Pembayaran</label>
+                <input
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.pdf"
+                  onChange={handlePaymentProofChange}
+                  className="w-full text-sm text-slate-600 file:border-0 file:bg-blue-500 file:text-white file:px-4 file:py-2 file:rounded-xl file:cursor-pointer"
+                />
+                {paymentProofName && (
+                  <p className="mt-2 text-xs text-slate-500">File terpilih: {paymentProofName}</p>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-4 text-sm text-blue-700">
+                Unggah bukti pembayaran untuk verifikasi admin. Setelah bukti diverifikasi, polis akan diaktifkan dan saldo premi akan tercatat.
               </div>
 
               <button
@@ -447,7 +495,7 @@ export default function HealthService({ user }) {
                 ) : (
                   <>
                     <CheckCircle2 className="w-4 h-4" />
-                    Konfirmasi Pembelian
+                    Kirim Bukti & Selesaikan
                   </>
                 )}
               </button>
@@ -464,9 +512,9 @@ export default function HealthService({ user }) {
                 <CheckCircle2 className="w-10 h-10 text-white" />
               </div>
 
-              <h2 className="text-2xl font-black text-slate-900 mb-2">Pembelian Berhasil!</h2>
+              <h2 className="text-2xl font-black text-slate-900 mb-2">Pengajuan Diterima</h2>
               <p className="text-slate-500 text-sm mb-6">
-                Polis Anda telah aktif dan tersimpan di profil Anda.
+                Bukti pembayaran Anda telah terkirim. Tunggu verifikasi admin sebelum polis diaktifkan.
               </p>
 
               {/* Nomor polis */}
@@ -481,7 +529,15 @@ export default function HealthService({ user }) {
                   { label: "Nama Tertanggung", value: successData.insured_name },
                   { label: "Coverage", value: formatRupiah(successData.coverage_limit) },
                   { label: "Berlaku Hingga", value: successData.end_date },
-                  { label: "Status", value: "AKTIF ✓" },
+                  {
+                    label: "Status",
+                    value:
+                      successData.payment_status === 'pending'
+                        ? 'Menunggu Verifikasi Admin'
+                        : successData.status === 'active'
+                        ? 'Aktif ✓'
+                        : 'Tidak Aktif',
+                  },
                 ].map(({ label, value }) => (
                   <div key={label} className="flex justify-between px-4 py-3">
                     <span className="text-xs text-slate-500">{label}</span>

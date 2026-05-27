@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Claim;
 use App\Models\HospitalRegistration;
 use App\Models\Transaction;
 use Carbon\Carbon;
@@ -20,7 +19,8 @@ class RiwayatController extends Controller
         }
 
         // Pendaftaran RS
-        $registrations = HospitalRegistration::where('user_id', $userId)
+        $registrations = HospitalRegistration::query()
+            ->where('user_id', $userId)
             ->with('hospital')
             ->latest()
             ->get()
@@ -39,7 +39,8 @@ class RiwayatController extends Controller
             ]);
 
         // Transaksi
-        $transactions = Transaction::where('user_id', $userId)
+        $transactions = Transaction::query()
+            ->where('user_id', $userId)
             ->latest('transaction_date')
             ->get()
             ->map(fn($t) => [
@@ -60,33 +61,35 @@ class RiwayatController extends Controller
                 'created_at'   => $t->transaction_date,
             ]);
 
-        // Klaim
-        $claims = Claim::where('user_id', $userId)
+        // Pendaftaran Layanan
+        $serviceRegistrations = \App\Models\ServiceRegistration::query()
+            ->where('user_id', $userId)
+            ->with('hospital')
             ->latest()
             ->get()
-            ->map(fn($c) => [
-                'id'           => $c->id,
-                'type'         => 'claim',
-                'title'        => 'Pengajuan Klaim',
-                'subtitle'     => 'Rp ' . number_format($c->claim_amount, 0, ',', '.'),
-                'detail'       => $c->description,
-                'queue_number' => null,
-                'barcode'      => null,
-                'status'       => $c->status,
-                'status_label' => match($c->status) {
-                    'approved' => 'Disetujui',
-                    'rejected' => 'Ditolak',
-                    'partial'  => 'Sebagian',
-                    default    => 'Menunggu',
+            ->map(fn($s) => [
+                'id'           => $s->id,
+                'type'         => 'service_registration',
+                'title'        => 'Pendaftaran Layanan',
+                'subtitle'     => $s->service_name,
+                'detail'       => ($s->hospital ? $s->hospital->name : 'Layanan Mandiri') . ' — ' . Carbon::parse($s->schedule_date)->format('d M Y') . ' (' . $s->schedule_time . ')',
+                'queue_number' => $s->queue_number,
+                'barcode'      => $s->barcode_data,
+                'status'       => $s->status,
+                'status_label' => match($s->status) {
+                    'registered' => 'Terdaftar',
+                    'completed'  => 'Selesai',
+                    'canceled'   => 'Dibatalkan',
+                    default      => 'Terdaftar',
                 },
-                'date'         => $c->created_at->format('d M Y, H:i'),
-                'created_at'   => $c->created_at,
+                'date'         => $s->created_at->format('d M Y, H:i'),
+                'created_at'   => $s->created_at,
             ]);
 
         // Gabung & sort by date terbaru
         $all = $registrations
             ->concat($transactions)
-            ->concat($claims)
+            ->concat($serviceRegistrations)
             ->sortByDesc('created_at')
             ->values();
 

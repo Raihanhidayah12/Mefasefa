@@ -24,6 +24,9 @@ export default defineConfig({
             usePolling: true,
         },
     },
+    optimizeDeps: {
+        include: ['recharts'],
+    },
     resolve: {
         alias: {
             // Membuat alias '@' mengarah ke folder 'resources/js'

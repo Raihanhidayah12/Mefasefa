@@ -6,9 +6,16 @@ import ChatBot from "./ChatBot";
 import HealthService from "./HealthService";
 import DaftarRS from "./DaftarRS";
 import PendaftaranRS from "./PendaftaranRS";
+import PendaftaranLayanan from "./PendaftaranLayanan";
 import Riwayat from "./Riwayat";
+import Asuransi from "./Asuransi";
+import Klaim from "./Klaim";
 import KalenderPengingat from "./KalenderPengingat";
 import Konsultasi from "./Konsultasi";
+import Feedback from "./Feedback";
+import SupportPage from "./SupportPage";
+import TentangKami from "./TentangKami";
+import Monitor from "./Monitor";
 import ReminderPopup from "./ReminderPopup";
 import axios from "axios";
 import {
@@ -173,18 +180,18 @@ export default function Home({ user, profile, onLogout }) {
     {
       icon: <MessageSquare className="w-7 h-7" />,
       label: "Feedback & Saran",
-      onClick: () => alert("Feedback"),
+      onClick: () => navigate("/feedback"),
       gradient: "from-green-500 via-green-600 to-emerald-600",
       color: "green",
       description: "Berikan masukan",
     },
     {
       icon: <Clock className="w-7 h-7" />,
-      label: "Riwayat Aktivitas",
+      label: "Riwayat",
       onClick: () => navigate("/riwayat"),
       gradient: "from-indigo-500 via-indigo-600 to-blue-600",
       color: "indigo",
-      description: "Lihat riwayat",
+      description: "Lihat riwayat pendaftaran dan transaksi",
     },
     {
       icon: <Activity className="w-7 h-7" />,
@@ -197,7 +204,7 @@ export default function Home({ user, profile, onLogout }) {
     {
       icon: <FileText className="w-7 h-7" />,
       label: "Pendaftaran Layanan",
-      onClick: () => alert("Pendaftaran"),
+      onClick: () => navigate("/pendaftaran-layanan"),
       gradient: "from-yellow-500 via-yellow-600 to-orange-500",
       color: "yellow",
       description: "Daftar layanan baru",
@@ -205,7 +212,7 @@ export default function Home({ user, profile, onLogout }) {
     {
       icon: <Users className="w-7 h-7" />,
       label: "Tentang Kami",
-      onClick: () => alert("About Us"),
+      onClick: () => navigate("/tentang"),
       gradient: "from-teal-500 via-teal-600 to-cyan-600",
       color: "teal",
       description: "Kenali lebih jauh",
@@ -215,6 +222,7 @@ export default function Home({ user, profile, onLogout }) {
   const sidebarMenu = [
     { icon: <HomeIcon className="w-5 h-5" />, label: "Home", onClick: () => navigate("/home") },
     { icon: <Bell className="w-5 h-5" />, label: "Notifikasi", onClick: () => navigate("/notifikasi") },
+    
     { icon: <MessageSquare className="w-5 h-5" />, label: "ChatBot", onClick: () => navigate("/chatbot") },
   ];
 
@@ -337,13 +345,17 @@ export default function Home({ user, profile, onLogout }) {
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
                 className="focus:outline-none group"
               >
-                {user?.profile_picture ? (
+                {user?.profile_picture && user.profile_picture !== '' ? (
                   <div className="relative">
                     <img 
                       src={user.profile_picture} 
                       alt="Profile" 
                       className="w-11 h-11 rounded-full object-cover border-2 border-white shadow-lg group-hover:scale-105 transition-transform duration-300" 
+                      onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
                     />
+                    <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 items-center justify-center text-white font-bold text-sm shadow-lg hidden">
+                      {getInitials(user?.name)}
+                    </div>
                     <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
                   </div>
                 ) : (
@@ -527,7 +539,11 @@ export default function Home({ user, profile, onLogout }) {
 
                       {/* Quick Actions */}
                       <div className="grid grid-cols-3 gap-3 mt-6">
-                        <button className="flex flex-col items-center gap-2 p-3 rounded-xl bg-white/60 hover:bg-white transition-all duration-300 group/action border border-gray-100">
+                        <button
+                          type="button"
+                          onClick={() => navigate("/klaim")}
+                          className="flex flex-col items-center gap-2 p-3 rounded-xl bg-white/60 hover:bg-white transition-all duration-300 group/action border border-gray-100"
+                        >
                           <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center group-hover/action:scale-110 transition-transform duration-300">
                             <FileText className="w-5 h-5 text-white" />
                           </div>
@@ -540,13 +556,21 @@ export default function Home({ user, profile, onLogout }) {
                             )}
                           </span>
                         </button>
-                        <button className="flex flex-col items-center gap-2 p-3 rounded-xl bg-white/60 hover:bg-white transition-all duration-300 group/action border border-gray-100">
+                        <button
+                          type="button"
+                          onClick={() => navigate("/asuransi")}
+                          className="flex flex-col items-center gap-2 p-3 rounded-xl bg-white/60 hover:bg-white transition-all duration-300 group/action border border-gray-100"
+                        >
                           <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center group-hover/action:scale-110 transition-transform duration-300">
-                            <Clock className="w-5 h-5 text-white" />
+                            <Shield className="w-5 h-5 text-white" />
                           </div>
-                          <span className="text-xs font-medium text-gray-700">Riwayat</span>
+                          <span className="text-xs font-medium text-gray-700">Asuransi</span>
                         </button>
-                        <button className="flex flex-col items-center gap-2 p-3 rounded-xl bg-white/60 hover:bg-white transition-all duration-300 group/action border border-gray-100">
+                        <button
+                          type="button"
+                          onClick={() => navigate("/monitor")}
+                          className="flex flex-col items-center gap-2 p-3 rounded-xl bg-white/60 hover:bg-white transition-all duration-300 group/action border border-gray-100"
+                        >
                           <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center group-hover/action:scale-110 transition-transform duration-300">
                             <Activity className="w-5 h-5 text-white" />
                           </div>
@@ -585,10 +609,7 @@ export default function Home({ user, profile, onLogout }) {
                     </h2>
                     <p className="text-gray-600">Akses cepat ke semua layanan kesehatan Anda</p>
                   </div>
-                  <button className="hidden md:flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-300 font-medium">
-                    <span>Lihat Semua</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
+                  
                 </div>
 
                 {/* Enhanced Service Grid */}
@@ -681,11 +702,18 @@ export default function Home({ user, profile, onLogout }) {
           <Route path="/notifikasi" element={<Notifikasi />} />
           <Route path="/chatbot" element={<ChatBot />} />
           <Route path="/health-service" element={<HealthService user={user} />} />
+          <Route path="/tentang" element={<TentangKami />} />
+          <Route path="/dukungan/:page" element={<SupportPage />} />
           <Route path="/daftarRS" element={<DaftarRS user={user} />} />
           <Route path="/daftar-rs/:id" element={<PendaftaranRS user={user} />} />
+          <Route path="/pendaftaran-layanan" element={<PendaftaranLayanan user={user} />} />
           <Route path="/riwayat" element={<Riwayat user={user} />} />
+          <Route path="/asuransi" element={<Asuransi user={user} />} />
+          <Route path="/klaim" element={<Klaim user={user} />} />
           <Route path="/kalender" element={<KalenderPengingat user={user} />} />
           <Route path="/konsul" element={<Konsultasi user={user} />} />
+          <Route path="/feedback" element={<Feedback user={user} />} />
+          <Route path="/monitor" element={<Monitor user={user} />} />
           
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
@@ -757,11 +785,19 @@ export default function Home({ user, profile, onLogout }) {
                 Dukungan
               </h3>
               <ul className="space-y-3 text-sm text-gray-400">
-                {["Pusat Bantuan", "Syarat & Ketentuan", "Kebijakan Privasi", "FAQ"].map((item) => (
-                  <li key={item}>
-                    <button className="hover:text-white transition-colors duration-300 flex items-center gap-2 group">
+                {[
+                  { label: "Pusat Bantuan", path: "/dukungan/pusat-bantuan" },
+                  { label: "Syarat & Ketentuan", path: "/dukungan/syarat-dan-ketentuan" },
+                  { label: "Kebijakan Privasi", path: "/dukungan/kebijakan-privasi" },
+                  { label: "FAQ", path: "/dukungan/faq" },
+                ].map((item) => (
+                  <li key={item.label}>
+                    <button
+                      onClick={() => navigate(item.path)}
+                      className="hover:text-white transition-colors duration-300 flex items-center gap-2 group"
+                    >
                       <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-300" />
-                      <span>{item}</span>
+                      <span>{item.label}</span>
                     </button>
                   </li>
                 ))}
@@ -851,9 +887,15 @@ export default function Home({ user, profile, onLogout }) {
 
           {/* User Info */}
           <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl">
-            {user?.profile_picture ? (
-              <img src={user.profile_picture} alt="Profile" className="w-12 h-12 rounded-full object-cover border-2 border-white shadow" />
-            ) : (
+            {user?.profile_picture && user.profile_picture !== '' ? (
+              <img 
+                src={user.profile_picture} 
+                alt="Profile" 
+                className="w-12 h-12 rounded-full object-cover border-2 border-white shadow"
+                onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+              />
+            ) : null}
+            {(!user?.profile_picture || user.profile_picture === '') && (
               <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold shadow">
                 {getInitials(user?.name)}
               </div>

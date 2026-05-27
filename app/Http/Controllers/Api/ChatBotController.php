@@ -375,7 +375,7 @@ class ChatBotController extends Controller
         // Default response
         return response()->json([
             'success' => true,
-            'message' => "Maaf, saya belum memahami pertanyaan Anda. 🤔\n\nSaya bisa membantu dengan:\n\n🏥 Aplikasi MefaSafe:\n• Cara klaim asuransi\n• Cek saldo asuransi\n• Daftar rumah sakit\n• Konsultasi dokter\n• Pembayaran premi\n• Kalender Pengingat jadwal & obat\n• Notifikasi & aktivitas\n\n💊 Kesehatan:\n• Gejala penyakit\n• Cara pencegahan\n• Rekomendasi pengobatan\n\nSilakan pilih salah satu atau ketik pertanyaan Anda dengan lebih spesifik.",
+            'message' => "Maaf, saya belum memahami pertanyaan Anda. 🤔\n\nSaya bisa membantu dengan topik berikut:\n\n🏥 Aplikasi MefaSafe:\n• Cara klaim asuransi\n• Cek saldo asuransi\n• Daftar rumah sakit\n• Konsultasi dokter\n• Pembayaran premi\n• Kalender Pengingat obat\n• Notifikasi dan aktivitas\n\n💊 Kesehatan:\n• Gejala penyakit\n• Cara mengatasi gejala\n• Obat dan pengobatan awal\n• Cara hidup sehat dan pencegahan\n\nSilakan ketik pertanyaan seperti \"Gejala demam\", \"Obat flu dan batuk\", \"Cara hidup sehat\", atau \"Konsultasi dokter\".",
             'timestamp' => now()->format('H:i'),
         ]);
     }
@@ -388,8 +388,7 @@ ATURAN PENTING:
 1. Kamu HANYA boleh menjawab pertanyaan tentang:
    - Aplikasi MefaSafe (fitur, layanan, cara penggunaan)
    - Asuransi kesehatan (klaim, premi, polis, coverage)
-   - SEMUA PENYAKIT dan kondisi kesehatan (gejala, penyebab, pencegahan, pengobatan, komplikasi)
-   - Pola hidup sehat (nutrisi, olahraga, mental health, sleep hygiene)
+   - SEMUA GEJALA PENYAKIT, CARA MENGATASI, OBAT, DAN GAYA HIDUP SEHAT (nutrisi, olahraga, mental health, sleep hygiene)
    - Rumah sakit dan fasilitas kesehatan
    - Konsultasi dokter dan layanan medis
    - Obat-obatan dan pengobatan
@@ -519,16 +518,17 @@ PROMPT;
         return response()->json([
             'success' => true,
             'data' => [
-                'Cara klaim asuransi',
-                'Cek saldo asuransi',
-                'Daftar rumah sakit',
-                'Konsultasi dokter',
-                'Cara bayar premi',
-                'Kalender pengingat obat',
-                'Cara buat pengingat',
                 'Gejala demam',
-                'Obat flu dan batuk',
-                'Cara cegah penyakit',
+                'Gejala flu dan batuk',
+                'Gejala hipertensi',
+                'Gejala diabetes',
+                'Obat maag dan asam lambung',
+                'Cara hidup sehat',
+                'Tips nutrisi dan gizi',
+                'Konsultasi dokter',
+                'Kalender pengingat obat',
+                'Cara klaim asuransi',
+                'Daftar rumah sakit',
             ]
         ]);
     }

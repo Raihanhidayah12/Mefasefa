@@ -10,10 +10,14 @@ use App\Http\Controllers\Api\HomeDashboardController;
 use App\Http\Controllers\Api\ReminderController;
 use App\Http\Controllers\Api\RiwayatController;
 use App\Http\Controllers\Api\HospitalRegistrationController;
+use App\Http\Controllers\Api\InsurancePackageController;
 use App\Http\Controllers\Api\InsurancePolicyController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\MonitorController;
+use App\Http\Controllers\Api\ServiceRegistrationController;
+use App\Http\Controllers\Api\HealthServiceController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/register', [\App\Http\Controllers\Api\AuthController::class, 'register']);
@@ -25,6 +29,8 @@ Route::prefix('v1')->group(function (): void {
     Route::apiResource('claims', ClaimController::class);
     Route::apiResource('transactions', TransactionController::class);
     Route::apiResource('hospital-registrations', HospitalRegistrationController::class);
+    Route::apiResource('service-registrations', ServiceRegistrationController::class);
+    Route::get('/health-services', [HealthServiceController::class, 'index']);
     Route::apiResource('doctor-consultations', DoctorConsultationController::class);
     Route::get('/doctor-consultations/{id}/messages', [DoctorConsultationController::class, 'getMessages']);
     Route::post('/doctor-consultations/{id}/messages', [DoctorConsultationController::class, 'sendMessage']);
@@ -44,8 +50,16 @@ Route::prefix('v1')->group(function (): void {
     // Home Dashboard route
     Route::get('/home-dashboard', [HomeDashboardController::class, 'index']);
 
+    // Package data
+    Route::get('/insurance-packages', [InsurancePackageController::class, 'index']);
+
     // My policies
     Route::get('/my-policies', [InsurancePolicyController::class, 'myPolicies']);
+
+    // Monitor - Saldo Polis dan Grafik Penggunaan
+    Route::get('/monitor/saldo-summary', [MonitorController::class, 'getPolicySaldoSummary']);
+    Route::get('/monitor/claims-history', [MonitorController::class, 'getClaimsHistory']);
+    Route::get('/monitor/saldo-chart', [MonitorController::class, 'getSaldoChart']);
 
     // Riwayat (registrasi RS + transaksi + klaim)
     Route::get('/riwayat', [RiwayatController::class, 'index']);

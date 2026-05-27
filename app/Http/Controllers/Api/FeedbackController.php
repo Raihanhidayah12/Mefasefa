@@ -22,6 +22,7 @@ class FeedbackController extends Controller
         $validated = $request->validate([
             'user_id' => ['required', 'exists:users,id'],
             'category' => ['required', 'in:layanan,kecepatan_klaim,kemudahan_akses'],
+            'rating' => ['required', 'integer', 'between:1,5'],
             'content' => ['required', 'string', 'max:5000'],
         ]);
 
@@ -50,6 +51,7 @@ class FeedbackController extends Controller
         $validated = $request->validate([
             'user_id' => ['sometimes', 'exists:users,id'],
             'category' => ['sometimes', 'in:layanan,kecepatan_klaim,kemudahan_akses'],
+            'rating' => ['sometimes', 'integer', 'between:1,5'],
             'content' => ['sometimes', 'string', 'max:5000'],
         ]);
 

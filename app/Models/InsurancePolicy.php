@@ -19,6 +19,9 @@ class InsurancePolicy extends Model
         'start_date',
         'end_date',
         'status',
+        'payment_method',
+        'payment_proof_path',
+        'payment_status',
     ];
 
     protected $casts = [

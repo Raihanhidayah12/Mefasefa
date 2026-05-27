@@ -14,14 +14,17 @@ function ChatBot() {
   const [inputMessage, setInputMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [quickReplies, setQuickReplies] = useState([
-    "Cara klaim asuransi",
-    "Cek saldo asuransi",
-    "Daftar rumah sakit",
-    "Konsultasi dokter",
-    "Cara bayar premi",
     "Gejala demam",
-    "Obat flu dan batuk",
-    "Cara cegah penyakit",
+    "Gejala flu dan batuk",
+    "Gejala hipertensi",
+    "Gejala diabetes",
+    "Obat maag dan asam lambung",
+    "Cara hidup sehat",
+    "Tips nutrisi dan gizi",
+    "Konsultasi dokter",
+    "Kalender pengingat obat",
+    "Cara klaim asuransi",
+    "Daftar rumah sakit",
   ]);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);

@@ -11,11 +11,18 @@ use Illuminate\Support\Str;
 
 class ClaimController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
+        $userId = $request->query('user_id');
+
+        $query = Claim::with(['user', 'insurancePolicy'])->latest();
+        if ($userId) {
+            $query->where('user_id', $userId);
+        }
+
         return response()->json([
             'message' => 'Claims retrieved successfully.',
-            'data' => Claim::with(['user', 'insurancePolicy'])->latest()->get(),
+            'data' => $query->get(),
         ], 200);
     }
 

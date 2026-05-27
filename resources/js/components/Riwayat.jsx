@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import {
   Building2, CreditCard, FileText, Clock,
   CheckCircle2, XCircle, AlertCircle, Loader2,
-  QrCode, ChevronDown, ChevronUp, Filter,
+  QrCode, ChevronDown, ChevronUp, Filter, Shield,
 } from "lucide-react";
 
 const TYPE_CONFIG = {
@@ -14,17 +14,17 @@ const TYPE_CONFIG = {
     iconColor: "text-blue-600",
     label: "Pendaftaran RS",
   },
+  service_registration: {
+    icon: FileText,
+    iconBg: "bg-yellow-100",
+    iconColor: "text-yellow-600",
+    label: "Pendaftaran Layanan",
+  },
   transaction: {
     icon: CreditCard,
     iconBg: "bg-purple-100",
     iconColor: "text-purple-600",
     label: "Transaksi",
-  },
-  claim: {
-    icon: FileText,
-    iconBg: "bg-orange-100",
-    iconColor: "text-orange-600",
-    label: "Klaim",
   },
 };
 
@@ -37,10 +37,14 @@ const STATUS_CONFIG = {
   approved:    { color: "bg-green-100 text-green-700", icon: CheckCircle2 },
   rejected:    { color: "bg-red-100 text-red-700",     icon: XCircle },
   partial:     { color: "bg-blue-100 text-blue-700",   icon: AlertCircle },
+  verified:    { color: "bg-green-100 text-green-700", icon: CheckCircle2 },
+  inactive:    { color: "bg-slate-100 text-slate-700", icon: Clock },
+  active:      { color: "bg-green-100 text-green-700", icon: CheckCircle2 },
 };
 
 export default function Riwayat({ user }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
@@ -62,15 +66,48 @@ export default function Riwayat({ user }) {
       }
     };
     if (user?.id) fetch();
-  }, [user?.id]);
+  }, [user?.id, token]);
+
+  const handleCancel = async (type, id) => {
+    const endpoint = type === "registration" ? "hospital-registrations" : "service-registrations";
+    const confirmCancel = window.confirm("Apakah Anda yakin ingin membatalkan pendaftaran ini?");
+    if (!confirmCancel) return;
+
+    try {
+      const res = await axios.put(
+        `http://127.0.0.1:8000/api/v1/${endpoint}/${id}`,
+        { status: "canceled" },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.data.success || res.status === 200) {
+        const refreshRes = await axios.get(
+          `http://127.0.0.1:8000/api/v1/riwayat?user_id=${user?.id}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (refreshRes.data.success) setItems(refreshRes.data.data);
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Gagal membatalkan pendaftaran.");
+    }
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const requestedFilter = params.get("filter");
+    const validFilters = ["all", "registration", "service_registration", "transaction"];
+    if (requestedFilter && validFilters.includes(requestedFilter)) {
+      setFilter(requestedFilter);
+    }
+  }, [location.search]);
 
   const filtered = filter === "all" ? items : items.filter((i) => i.type === filter);
 
   const counts = {
     all: items.length,
     registration: items.filter((i) => i.type === "registration").length,
+    service_registration: items.filter((i) => i.type === "service_registration").length,
     transaction: items.filter((i) => i.type === "transaction").length,
-    claim: items.filter((i) => i.type === "claim").length,
   };
 
   return (
@@ -82,7 +119,7 @@ export default function Riwayat({ user }) {
             <Clock className="w-6 h-6 text-indigo-500" />
             Riwayat Aktivitas
           </h1>
-          <p className="text-sm text-slate-500 mt-1">Semua riwayat pendaftaran, transaksi, dan klaim Anda</p>
+          <p className="text-sm text-slate-500 mt-1">Semua riwayat pendaftaran dan transaksi Anda</p>
         </div>
       </div>
 
@@ -92,8 +129,8 @@ export default function Riwayat({ user }) {
           {[
             { key: "all", label: "Semua" },
             { key: "registration", label: "Pendaftaran RS" },
+            { key: "service_registration", label: "Pendaftaran Layanan" },
             { key: "transaction", label: "Transaksi" },
-            { key: "claim", label: "Klaim" },
           ].map(({ key, label }) => (
             <button
               key={key}
@@ -174,8 +211,8 @@ export default function Riwayat({ user }) {
                     <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-4 space-y-3">
                       <p className="text-sm text-slate-600">{item.detail}</p>
 
-                      {/* Nomor antrian & barcode khusus pendaftaran RS */}
-                      {item.type === "registration" && item.queue_number && (
+                      {/* Nomor antrian & barcode khusus pendaftaran RS & Layanan */}
+                      {(item.type === "registration" || item.type === "service_registration") && item.queue_number && (
                         <div className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 p-4 text-white">
                           <div className="flex items-center justify-between">
                             <div>
@@ -187,6 +224,18 @@ export default function Riwayat({ user }) {
                               <p className="text-[9px] opacity-70 font-mono break-all max-w-[140px]">{item.barcode}</p>
                             </div>
                           </div>
+                        </div>
+                      )}
+
+                      {/* Tombol Batal */}
+                      {item.status === "registered" && (
+                        <div className="flex justify-end pt-2">
+                          <button
+                            onClick={() => handleCancel(item.type, item.id)}
+                            className="px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-xs font-semibold transition-all"
+                          >
+                            Batalkan Pendaftaran
+                          </button>
                         </div>
                       )}
                     </div>

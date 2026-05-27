@@ -164,11 +164,12 @@ export default function Profile({ user, profile, onUpdate }) {
                 accept=".jpg,.jpeg,.png" 
                 onChange={(e) => setProfilePictureFile(e.target.files[0])}
               />
-              {profilePictureFile || user?.profile_picture ? (
+              {profilePictureFile || (user?.profile_picture && user.profile_picture !== '') ? (
                 <img
                   src={profilePictureFile ? URL.createObjectURL(profilePictureFile) : user.profile_picture}
                   alt="Foto profil"
                   className="w-32 h-32 rounded-[24px] object-cover border-[6px] border-white shadow-[0_20px_50px_-18px_rgba(79,70,229,0.45)] transition duration-500 group-hover:scale-[1.02]"
+                  onError={(e) => { e.target.style.display = 'none'; }}
                 />
               ) : (
                 <div className="w-32 h-32 rounded-[24px] bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-500 flex items-center justify-center text-white font-black text-3xl shadow-[0_20px_50px_-18px_rgba(79,70,229,0.5)] border-[6px] border-white relative overflow-hidden animate-[float_5s_ease-in-out_infinite]">
