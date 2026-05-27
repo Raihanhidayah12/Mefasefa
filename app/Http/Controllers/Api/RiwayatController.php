@@ -68,22 +68,26 @@ class RiwayatController extends Controller
             ->latest()
             ->get()
             ->map(fn($s) => [
-                'id'           => $s->id,
-                'type'         => 'service_registration',
-                'title'        => 'Pendaftaran Layanan',
-                'subtitle'     => $s->service_name,
-                'detail'       => ($s->hospital ? $s->hospital->name : 'Layanan Mandiri') . ' — ' . Carbon::parse($s->schedule_date)->format('d M Y') . ' (' . $s->schedule_time . ')',
-                'queue_number' => $s->queue_number,
-                'barcode'      => $s->barcode_data,
-                'status'       => $s->status,
-                'status_label' => match($s->status) {
+                'id'                   => $s->id,
+                'type'                 => 'service_registration',
+                'title'                => 'Pendaftaran Layanan',
+                'subtitle'             => $s->service_name,
+                'detail'               => ($s->hospital ? $s->hospital->name : 'Layanan Mandiri') . ' — ' . Carbon::parse($s->schedule_date)->format('d M Y') . ' (' . $s->schedule_time . ')',
+                'queue_number'         => $s->queue_number,
+                'barcode'              => $s->barcode_data,
+                'status'               => $s->status,
+                'status_label'         => match($s->status) {
                     'registered' => 'Terdaftar',
                     'completed'  => 'Selesai',
                     'canceled'   => 'Dibatalkan',
                     default      => 'Terdaftar',
                 },
-                'date'         => $s->created_at->format('d M Y, H:i'),
-                'created_at'   => $s->created_at,
+                'date'                 => $s->created_at->format('d M Y, H:i'),
+                'created_at'           => $s->created_at,
+                'minutes_since_created'=> (int) $s->created_at->diffInMinutes(now()),
+                'can_cancel'           => $s->status === 'registered' && $s->created_at->diffInMinutes(now()) < 60,
+                'uses_insurance'       => !is_null($s->insurance_policy_id),
+                'price'                => (float) $s->price,
             ]);
 
         // Gabung & sort by date terbaru

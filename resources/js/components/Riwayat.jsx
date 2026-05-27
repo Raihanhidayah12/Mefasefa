@@ -68,11 +68,14 @@ export default function Riwayat({ user }) {
     if (user?.id) fetch();
   }, [user?.id, token]);
 
+  const [cancelLoading, setCancelLoading] = useState(null); // id yang sedang dicancel
+
   const handleCancel = async (type, id) => {
     const endpoint = type === "registration" ? "hospital-registrations" : "service-registrations";
     const confirmCancel = window.confirm("Apakah Anda yakin ingin membatalkan pendaftaran ini?");
     if (!confirmCancel) return;
 
+    setCancelLoading(id);
     try {
       const res = await axios.put(
         `http://127.0.0.1:8000/api/v1/${endpoint}/${id}`,
@@ -80,6 +83,8 @@ export default function Riwayat({ user }) {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (res.data.success || res.status === 200) {
+        const msg = res.data.message || "Pendaftaran berhasil dibatalkan.";
+        alert(msg);
         const refreshRes = await axios.get(
           `http://127.0.0.1:8000/api/v1/riwayat?user_id=${user?.id}`,
           { headers: { Authorization: `Bearer ${token}` } }
@@ -87,8 +92,10 @@ export default function Riwayat({ user }) {
         if (refreshRes.data.success) setItems(refreshRes.data.data);
       }
     } catch (e) {
-      console.error(e);
-      alert("Gagal membatalkan pendaftaran.");
+      const msg = e?.response?.data?.message || "Gagal membatalkan pendaftaran.";
+      alert(msg);
+    } finally {
+      setCancelLoading(null);
     }
   };
 
@@ -227,14 +234,68 @@ export default function Riwayat({ user }) {
                         </div>
                       )}
 
-                      {/* Tombol Batal */}
-                      {item.status === "registered" && (
+                      {/* Tombol Batal — hanya untuk service_registration dengan logika waktu */}
+                      {item.type === "service_registration" && item.status === "registered" && (() => {
+                        const minutesLeft = Math.max(0, 60 - (item.minutes_since_created ?? 60));
+                        const canCancel = item.can_cancel;
+
+                        return (
+                          <div className="pt-2 space-y-2">
+                            {canCancel ? (
+                              <>
+                                {/* Info waktu tersisa */}
+                                <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl">
+                                  <Clock className="w-3.5 h-3.5 shrink-0" />
+                                  <span>
+                                    Batas pembatalan:{" "}
+                                    <strong>
+                                      {minutesLeft > 0
+                                        ? `${minutesLeft} menit lagi`
+                                        : "kurang dari 1 menit"}
+                                    </strong>
+                                    {item.uses_insurance && " · Saldo asuransi akan dikembalikan"}
+                                  </span>
+                                </div>
+                                <div className="flex justify-end">
+                                  <button
+                                    onClick={() => handleCancel(item.type, item.id)}
+                                    disabled={cancelLoading === item.id}
+                                    className="px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-xs font-semibold transition-all disabled:opacity-50 flex items-center gap-1.5"
+                                  >
+                                    {cancelLoading === item.id ? (
+                                      <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Membatalkan...</>
+                                    ) : (
+                                      <><XCircle className="w-3.5 h-3.5" /> Batalkan Pendaftaran</>
+                                    )}
+                                  </button>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl">
+                                <XCircle className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                                <span>
+                                  Tidak dapat dibatalkan — batas waktu 1 jam telah terlewati.
+                                  {item.uses_insurance && " Saldo asuransi tidak dapat dikembalikan."}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+
+                      {/* Tombol Batal untuk pendaftaran RS biasa */}
+                      {item.type === "registration" && item.status === "registered" && (
                         <div className="flex justify-end pt-2">
                           <button
                             onClick={() => handleCancel(item.type, item.id)}
-                            className="px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-xs font-semibold transition-all"
+                            disabled={cancelLoading === item.id}
+                            className="px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-xs font-semibold transition-all disabled:opacity-50 flex items-center gap-1.5"
                           >
-                            Batalkan Pendaftaran
+                            {cancelLoading === item.id ? (
+                              <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Membatalkan...</>
+                            ) : (
+                              <><XCircle className="w-3.5 h-3.5" /> Batalkan Pendaftaran</>
+                            )}
                           </button>
                         </div>
                       )}

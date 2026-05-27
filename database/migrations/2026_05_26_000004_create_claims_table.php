@@ -14,7 +14,7 @@ return new class extends Migration
             $table->foreignId('insurance_policy_id')->constrained()->cascadeOnDelete();
             $table->decimal('claim_amount', 15, 2);
             $table->text('description');
-            $table->string('document_path');
+            $table->string('document_path')->nullable();
             $table->enum('status', ['pending', 'approved', 'rejected', 'partial'])->default('pending');
             $table->timestamps();
         });

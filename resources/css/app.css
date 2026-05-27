@@ -31,3 +31,13 @@
 .animate-slide-up {
   animation: slideUp 0.4s ease-out;
 }
+
+/* Chat notification toast progress bar */
+@keyframes shrinkBar {
+  from { width: 100%; }
+  to   { width: 0%; }
+}
+
+.animate-shrink-bar {
+  animation: shrinkBar 5s linear forwards;
+}

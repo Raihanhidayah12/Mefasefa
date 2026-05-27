@@ -8,7 +8,7 @@ import bel from "../../../assets/bel.png";
 import toa from "../../../assets/toa.png";
 import kertas from "../../../assets/kertas.png";
 
-function Notification() {
+function Notification({ user }) {
   const [data, setData] = useState([]);
   const [summary, setSummary] = useState({
     today_notifications: 0,
@@ -40,6 +40,7 @@ function Notification() {
     try {
       const token = localStorage.getItem("mefasafe_token") || localStorage.getItem("token");
       const response = await axios.get("http://127.0.0.1:8000/api/v1/notifications", {
+        params: { user_id: user?.id },
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -58,6 +59,7 @@ function Notification() {
     try {
       const token = localStorage.getItem("mefasafe_token") || localStorage.getItem("token");
       const response = await axios.get("http://127.0.0.1:8000/api/v1/notifications/summary", {
+        params: { user_id: user?.id },
         headers: {
           Authorization: `Bearer ${token}`,
         },

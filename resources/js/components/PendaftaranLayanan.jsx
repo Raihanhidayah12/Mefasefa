@@ -78,6 +78,7 @@ export default function PendaftaranLayanan({ user }) {
   const [categories, setCategories] = useState([]);
   const [hospitals, setHospitals] = useState([]);
   const [userPolicy, setUserPolicy] = useState(null);
+  const [policyBalance, setPolicyBalance] = useState(null); // sisa saldo polis
   const [loadingServices, setLoadingServices] = useState(true);
   const [loadingHospitals, setLoadingHospitals] = useState(true);
   const [successData, setSuccessData] = useState(null);
@@ -134,12 +135,26 @@ export default function PendaftaranLayanan({ user }) {
       .catch(() => setError("Gagal mengambil data rumah sakit mitra."))
       .finally(() => setLoadingHospitals(false));
 
-    // Fetch Polis Asuransi Aktif
+    // Fetch Polis Asuransi Aktif + Saldo
     if (user?.id) {
       axios.get(`http://127.0.0.1:8000/api/v1/my-policies?user_id=${user.id}`, { headers })
         .then((res) => {
           const active = (res.data.data || []).find((p) => p.status === "active");
           setUserPolicy(active || null);
+
+          // Fetch saldo dari monitor
+          if (active) {
+            axios.get(`http://127.0.0.1:8000/api/v1/monitor/saldo-summary?user_id=${user.id}`, { headers })
+              .then((r) => {
+                if (r.data.success) {
+                  // Cari saldo berdasarkan tipe polis yang aktif
+                  const summary = r.data.data?.summary || [];
+                  const match = summary.find(s => s.type === active.insurance_type);
+                  setPolicyBalance(match ? match.remaining_balance : null);
+                }
+              })
+              .catch(() => {});
+          }
         })
         .catch(() => {});
     }
@@ -555,11 +570,45 @@ export default function PendaftaranLayanan({ user }) {
                       <p className="text-xs text-blue-600 mt-0.5">
                         {userPolicy.insurance_type} — {userPolicy.insured_name}
                       </p>
+                      {/* Saldo info */}
+                      {policyBalance !== null && (
+                        <div className="mt-2 flex items-center gap-3 flex-wrap">
+                          <span className="text-xs text-slate-500">
+                            Saldo tersedia:{" "}
+                            <span className="font-bold text-emerald-600">
+                              {formatRupiah(policyBalance)}
+                            </span>
+                          </span>
+                          {useInsurance && selectedService && (
+                            <>
+                              <span className="text-slate-300">→</span>
+                              <span className="text-xs text-slate-500">
+                                Setelah digunakan:{" "}
+                                <span className={`font-bold ${policyBalance - selectedService.price < 0 ? "text-red-500" : "text-blue-600"}`}>
+                                  {formatRupiah(Math.max(0, policyBalance - selectedService.price))}
+                                </span>
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-green-100 text-green-700 shrink-0">
                       POLIS AKTIF
                     </span>
                   </div>
+
+                  {/* Peringatan saldo tidak cukup */}
+                  {useInsurance && selectedService && policyBalance !== null && policyBalance < selectedService.price && (
+                    <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 text-xs px-4 py-3 rounded-xl">
+                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <span>
+                        Saldo asuransi tidak mencukupi. Kekurangan:{" "}
+                        <strong>{formatRupiah(selectedService.price - policyBalance)}</strong>.
+                        Silakan bayar mandiri atau isi ulang polis.
+                      </span>
+                    </div>
+                  )}
 
                   <label className="flex items-center gap-3 cursor-pointer select-none">
                     <div

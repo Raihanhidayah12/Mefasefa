@@ -19,11 +19,17 @@ class NotificationController extends Controller
      */
     public function index(Request $request)
     {
-        $user = Auth::user();
+        $userId = $request->query('user_id') ?? Auth::id();
+        if (!$userId) {
+            return response()->json([
+                'success' => true,
+                'data' => [],
+            ]);
+        }
         $notifications = [];
 
         // 1. Notifikasi dari Claims
-        $claims = Claim::where('user_id', $user->id)
+        $claims = Claim::where('user_id', $userId)
             ->orderBy('updated_at', 'desc')
             ->get();
 
@@ -43,7 +49,7 @@ class NotificationController extends Controller
         }
 
         // 2. Notifikasi dari Transactions
-        $transactions = Transaction::where('user_id', $user->id)
+        $transactions = Transaction::where('user_id', $userId)
             ->orderBy('transaction_date', 'desc')
             ->get();
 
@@ -63,7 +69,7 @@ class NotificationController extends Controller
         }
 
         // 3. Notifikasi dari Hospital Registrations
-        $hospitalRegs = HospitalRegistration::where('user_id', $user->id)
+        $hospitalRegs = HospitalRegistration::where('user_id', $userId)
             ->orderBy('schedule_date', 'desc')
             ->get();
 
@@ -83,7 +89,7 @@ class NotificationController extends Controller
         }
 
         // 4. Notifikasi dari Doctor Consultations
-        $consultations = DoctorConsultation::where('user_id', $user->id)
+        $consultations = DoctorConsultation::where('user_id', $userId)
             ->orderBy('updated_at', 'desc')
             ->get();
 
@@ -103,7 +109,7 @@ class NotificationController extends Controller
         }
 
         // 5. Notifikasi dari Reminders yang jatuh tempo hari ini
-        $todayReminders = Reminder::where('user_id', $user->id)
+        $todayReminders = Reminder::where('user_id', $userId)
             ->whereDate('reminder_date', Carbon::today())
             ->where('is_done', false)
             ->orderBy('reminder_time')
@@ -149,67 +155,85 @@ class NotificationController extends Controller
      */
     public function summary(Request $request)
     {
-        $user = Auth::user();
+        $userId = $request->query('user_id') ?? Auth::id();
+        if (!$userId) {
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'today_notifications' => 0,
+                    'unread_count' => 0,
+                    'verified_count' => 0,
+                    'needs_attention_count' => 0,
+                    'priority_count' => 0,
+                    'weekly_activity' => [
+                        'claims_submitted' => 0,
+                        'successful_payments' => 0,
+                        'active_reminders' => 0,
+                    ],
+                ],
+            ]);
+        }
+        
         $weekAgo = Carbon::now()->subDays(7);
 
         // Count claims in last 7 days
-        $claimsCount = Claim::where('user_id', $user->id)
+        $claimsCount = Claim::where('user_id', $userId)
             ->where('created_at', '>=', $weekAgo)
             ->count();
 
         // Count successful transactions in last 7 days
-        $successfulTransactions = Transaction::where('user_id', $user->id)
+        $successfulTransactions = Transaction::where('user_id', $userId)
             ->where('status', 'success')
             ->where('transaction_date', '>=', $weekAgo)
             ->count();
 
         // Count upcoming hospital appointments (reminders)
-        $upcomingAppointments = HospitalRegistration::where('user_id', $user->id)
+        $upcomingAppointments = HospitalRegistration::where('user_id', $userId)
             ->where('status', 'registered')
             ->where('schedule_date', '>=', Carbon::now())
             ->count();
 
         // Count unread notifications (pending/waiting status)
-        $unreadCount = Claim::where('user_id', $user->id)
+        $unreadCount = Claim::where('user_id', $userId)
             ->where('status', 'pending')
             ->count();
 
-        $unreadCount += DoctorConsultation::where('user_id', $user->id)
+        $unreadCount += DoctorConsultation::where('user_id', $userId)
             ->where('status', 'waiting_approval')
             ->count();
 
         // Count verified items (approved claims + successful transactions)
-        $verifiedCount = Claim::where('user_id', $user->id)
+        $verifiedCount = Claim::where('user_id', $userId)
             ->where('status', 'approved')
             ->count();
 
-        $verifiedCount += Transaction::where('user_id', $user->id)
+        $verifiedCount += Transaction::where('user_id', $userId)
             ->where('status', 'success')
             ->count();
 
         // Count items needing attention (rejected, failed, pending)
-        $needsAttentionCount = Claim::where('user_id', $user->id)
+        $needsAttentionCount = Claim::where('user_id', $userId)
             ->whereIn('status', ['rejected', 'pending'])
             ->count();
 
-        $needsAttentionCount += Transaction::where('user_id', $user->id)
+        $needsAttentionCount += Transaction::where('user_id', $userId)
             ->whereIn('status', ['failed', 'pending'])
             ->count();
 
         // Total active notifications today
-        $todayNotifications = Claim::where('user_id', $user->id)
+        $todayNotifications = Claim::where('user_id', $userId)
             ->whereDate('updated_at', Carbon::today())
             ->count();
 
-        $todayNotifications += Transaction::where('user_id', $user->id)
+        $todayNotifications += Transaction::where('user_id', $userId)
             ->whereDate('transaction_date', Carbon::today())
             ->count();
 
-        $todayNotifications += DoctorConsultation::where('user_id', $user->id)
+        $todayNotifications += DoctorConsultation::where('user_id', $userId)
             ->whereDate('updated_at', Carbon::today())
             ->count();
 
-        $todayNotifications += \App\Models\Reminder::where('user_id', $user->id)
+        $todayNotifications += \App\Models\Reminder::where('user_id', $userId)
             ->whereDate('reminder_date', Carbon::today())
             ->where('is_done', false)
             ->count();

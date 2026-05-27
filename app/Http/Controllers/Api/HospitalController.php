@@ -38,6 +38,7 @@ class HospitalController extends Controller
                 'type'        => $h->type,
                 'facilities'  => $h->facilities,
                 'is_partner'  => $h->is_partner,
+                'is_active'   => $h->is_active,
                 'distance_km' => $distance ? round($distance, 1) : null,
             ];
         });

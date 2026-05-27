@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation, Routes, Route, Navigate } from "react-router-dom";
 import Profile from "./Profile";
 import Notifikasi from "./Notifikasi";
@@ -17,6 +17,8 @@ import SupportPage from "./SupportPage";
 import TentangKami from "./TentangKami";
 import Monitor from "./Monitor";
 import ReminderPopup from "./ReminderPopup";
+import ChatNotifToast from "./ChatNotifToast";
+import { useChatNotif } from "./useChatNotif";
 import axios from "axios";
 import {
   Menu,
@@ -63,6 +65,27 @@ export default function Home({ user, profile, onLogout }) {
   const [dashboardData, setDashboardData] = useState(null);
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [reminderBadge, setReminderBadge] = useState(0);
+
+  // ── Chat Notifications ───────────────────────────────────────────────
+  const [chatToasts, setChatToasts] = useState([]);
+  const toastCounter = useRef(0);
+
+  const { unreadCount: chatUnread, clearAll: clearChatBadge } = useChatNotif({
+    role: "user",
+    userId: user?.id,
+    onNewMsg: (consultationId, msg, consultation) => {
+      setChatToasts((prev) => [
+        ...prev,
+        {
+          id: ++toastCounter.current,
+          consultationId,
+          role: "user",
+          senderName: consultation?.doctor_name || "Dokter",
+          message: msg.message,
+        },
+      ]);
+    },
+  });
 
   useEffect(() => {
     if (user?.id) fetchDashboardData();
@@ -163,10 +186,11 @@ export default function Home({ user, profile, onLogout }) {
     {
       icon: <Stethoscope className="w-7 h-7" />,
       label: "Konsultasi Dokter",
-      onClick: () => navigate("/konsul"),
+      onClick: () => { navigate("/konsul"); clearChatBadge(); },
       gradient: "from-purple-500 via-purple-600 to-pink-600",
       color: "purple",
       description: "Chat dengan dokter",
+      badge: chatUnread > 0 ? chatUnread : null,
     },
     {
       icon: <Calendar className="w-7 h-7" />,
@@ -221,8 +245,12 @@ export default function Home({ user, profile, onLogout }) {
 
   const sidebarMenu = [
     { icon: <HomeIcon className="w-5 h-5" />, label: "Home", onClick: () => navigate("/home") },
-    { icon: <Bell className="w-5 h-5" />, label: "Notifikasi", onClick: () => navigate("/notifikasi") },
-    
+    {
+      icon: <Bell className="w-5 h-5" />,
+      label: "Notifikasi",
+      onClick: () => { navigate("/notifikasi"); clearChatBadge(); },
+      badge: chatUnread > 0 ? chatUnread : null,
+    },
     { icon: <MessageSquare className="w-5 h-5" />, label: "ChatBot", onClick: () => navigate("/chatbot") },
   ];
 
@@ -413,7 +441,6 @@ export default function Home({ user, profile, onLogout }) {
       </header>
 
       <main className={`relative z-10 ${isChatBot ? "p-0" : "px-4 md:px-6 py-8"}`}>
-        <ReminderPopup userId={user?.id} />
         <Routes>
           <Route path="/home" element={
             <div className="max-w-7xl mx-auto space-y-8">
@@ -699,7 +726,7 @@ export default function Home({ user, profile, onLogout }) {
               </div>
             </div>
           } />
-          <Route path="/notifikasi" element={<Notifikasi />} />
+          <Route path="/notifikasi" element={<Notifikasi user={user} />} />
           <Route path="/chatbot" element={<ChatBot />} />
           <Route path="/health-service" element={<HealthService user={user} />} />
           <Route path="/tentang" element={<TentangKami />} />
@@ -1078,6 +1105,16 @@ export default function Home({ user, profile, onLogout }) {
           background-size: 32px 32px;
         }
       `}</style>
+      
+      {/* Global Overlays */}
+      <div className="relative z-[99999]">
+        <ReminderPopup userId={user?.id} />
+        <ChatNotifToast
+          toasts={chatToasts}
+          onDismiss={(id) => setChatToasts((prev) => prev.filter((t) => t.id !== id))}
+          onOpen={() => { navigate("/konsul"); clearChatBadge(); }}
+        />
+      </div>
     </div>
   );
 }

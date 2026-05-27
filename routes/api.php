@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\MonitorController;
 use App\Http\Controllers\Api\ServiceRegistrationController;
 use App\Http\Controllers\Api\HealthServiceController;
+use App\Http\Controllers\Api\AdminController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/register', [\App\Http\Controllers\Api\AuthController::class, 'register']);
@@ -34,6 +35,7 @@ Route::prefix('v1')->group(function (): void {
     Route::apiResource('doctor-consultations', DoctorConsultationController::class);
     Route::get('/doctor-consultations/{id}/messages', [DoctorConsultationController::class, 'getMessages']);
     Route::post('/doctor-consultations/{id}/messages', [DoctorConsultationController::class, 'sendMessage']);
+    Route::post('/doctor-consultations/{id}/upload-proof', [DoctorConsultationController::class, 'uploadProof']);
     Route::apiResource('feedbacks', FeedbackController::class);
     Route::get('/user-insurance', [InsurancePolicyController::class, 'index']);
     Route::get('/claims/status', [ClaimController::class, 'index']);
@@ -80,4 +82,47 @@ Route::prefix('v1')->group(function (): void {
     Route::put('/hospitals/{id}', [HospitalController::class, 'update']);
     Route::delete('/hospitals/{id}', [HospitalController::class, 'destroy']);
     Route::get('/doctors', [HospitalController::class, 'allDoctors']);
+
+    // ─── Admin Routes ─────────────────────────────────────────────────────────
+    Route::prefix('admin')->group(function () {
+        Route::get('/stats', [AdminController::class, 'stats']);
+
+        // Users
+        Route::get('/users', [AdminController::class, 'users']);
+        Route::put('/users/{id}', [AdminController::class, 'updateUser']);
+        Route::delete('/users/{id}', [AdminController::class, 'deleteUser']);
+
+        // Claims
+        Route::get('/claims', [AdminController::class, 'claims']);
+        Route::put('/claims/{id}', [AdminController::class, 'updateClaim']);
+
+        // Insurance Policies
+        Route::get('/policies', [AdminController::class, 'policies']);
+        Route::put('/policies/{id}', [AdminController::class, 'updatePolicy']);
+
+        // Transactions
+        Route::get('/transactions', [AdminController::class, 'transactions']);
+
+        // Hospitals
+        Route::get('/hospitals', [AdminController::class, 'hospitals']);
+
+        // Consultations
+        Route::get('/consultations', [AdminController::class, 'consultations']);
+        Route::put('/consultations/{id}', [AdminController::class, 'updateConsultation']);
+        Route::post('/consultations/{id}/verify-payment', [AdminController::class, 'verifyConsultationPayment']);
+        Route::post('/consultations/{id}/messages', [AdminController::class, 'sendConsultationMessage']);
+
+        // Feedbacks
+        Route::get('/feedbacks', [AdminController::class, 'feedbacks']);
+
+        // Hospital Registrations
+        Route::get('/hospital-registrations', [AdminController::class, 'hospitalRegistrations']);
+
+        // Service Registrations
+        Route::get('/service-registrations', [AdminController::class, 'serviceRegistrations']);
+
+        // Insurance Packages
+        Route::get('/packages', [AdminController::class, 'packages']);
+        Route::put('/packages/{id}', [AdminController::class, 'updatePackage']);
+    });
 });

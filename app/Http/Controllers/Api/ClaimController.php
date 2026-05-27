@@ -33,11 +33,14 @@ class ClaimController extends Controller
             'insurance_policy_id' => ['required', 'exists:insurance_policies,id'],
             'claim_amount' => ['required', 'numeric', 'min:0', 'regex:/^\d+(\.\d{1,2})?$/'],
             'description' => ['required', 'string', 'max:5000'],
-            'document' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:4096'],
+            'document' => ['sometimes', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:4096'],
             'status' => ['sometimes', 'in:pending,approved,rejected,partial'],
         ]);
 
-        $documentPath = $this->uploadFile($request->file('document'));
+        $documentPath = null;
+        if ($request->hasFile('document')) {
+            $documentPath = $this->uploadFile($request->file('document'));
+        }
 
         $claim = Claim::create([
             'user_id' => $validated['user_id'],

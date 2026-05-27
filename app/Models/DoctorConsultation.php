@@ -9,10 +9,13 @@ class DoctorConsultation extends Model
 {
     protected $fillable = [
         'user_id',
+        'insurance_policy_id',
         'doctor_name',
         'specialist_type',
         'consultation_type',
         'payment_status',
+        'payment_method',
+        'payment_proof_path',
         'session_duration_minutes',
         'status',
     ];
@@ -24,6 +27,11 @@ class DoctorConsultation extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function insurancePolicy(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\InsurancePolicy::class);
     }
 
     public function messages()

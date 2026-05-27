@@ -4,36 +4,90 @@ import axios from "axios";
 import { 
     Stethoscope, Calendar, Clock, Video, MessageSquare, 
     ChevronLeft, Send, Search, Star, Shield, AlertCircle, 
-    MoreVertical, Info, CheckCircle2, Trash2, X
+    MoreVertical, Info, CheckCircle2, Trash2, X,
+    CreditCard, Wallet, BadgeCheck, ArrowLeft, Loader2,
+    Upload, Copy, Building2
 } from "lucide-react";
 
+const CONSULTATION_PRICE = 75000;
+
+const BANK_ACCOUNTS = [
+    { bank: "BCA", norek: "1234567890", atas_nama: "PT MefaSafe Indonesia" },
+    { bank: "Mandiri", norek: "9876543210", atas_nama: "PT MefaSafe Indonesia" },
+    { bank: "BNI", norek: "1122334455", atas_nama: "PT MefaSafe Indonesia" },
+];
+
+const formatRupiah = (n) => "Rp " + Number(n).toLocaleString("id-ID");
 export default function Konsultasi({ user }) {
-    const [activeTab, setActiveTab] = useState("doctors"); // 'doctors', 'history'
+    const [activeTab, setActiveTab] = useState("doctors");
     const [consultations, setConsultations] = useState([]);
     const [loading, setLoading] = useState(false);
     const [selectedDoctor, setSelectedDoctor] = useState(null);
-    const [activeChat, setActiveChat] = useState(null); // the consultation object
+    const [activeChat, setActiveChat] = useState(null);
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
-    const [deleteTarget, setDeleteTarget] = useState(null); // consultation to delete
+    const [deleteTarget, setDeleteTarget] = useState(null);
     const [deleting, setDeleting] = useState(false);
 
     const messagesEndRef = useRef(null);
+    const prevMsgCount   = useRef(0);
+    const activeChatRef  = useRef(null); // mirror of activeChat for use inside intervals
 
     const [doctors, setDoctors] = useState([]);
 
+    // ── Booking modal state ──────────────────────────────────────────────
+    const [bookingStep, setBookingStep] = useState(1); // 1=pilih tipe, 2=pembayaran, 3=upload bukti
+    const [bookingType, setBookingType] = useState(null);
+    const [paymentMethod, setPaymentMethod] = useState(null);
+    const [bookingLoading, setBookingLoading] = useState(false);
+    const [bookingError, setBookingError] = useState("");
+    const [pendingConsultId, setPendingConsultId] = useState(null); // untuk upload bukti transfer
+    const [proofFile, setProofFile] = useState(null);
+    const [uploadLoading, setUploadLoading] = useState(false);
+    const [copiedNorek, setCopiedNorek] = useState(null);
+
+    // ── Insurance policy state ───────────────────────────────────────────
+    const [userPolicy, setUserPolicy] = useState(null);
+    const [policyBalance, setPolicyBalance] = useState(null);
+
+    useEffect(() => {
+        if (!user?.id) return;
+        const token = localStorage.getItem("mefasafe_token");
+        const headers = { Authorization: `Bearer ${token}` };
+        // Fetch polis aktif
+        axios.get(`/api/v1/my-policies?user_id=${user.id}`, { headers })
+            .then(res => {
+                const active = (res.data.data || []).find(p => p.status === "active");
+                setUserPolicy(active || null);
+                if (active) {
+                    // Fetch saldo
+                    axios.get(`/api/v1/monitor/saldo-summary?user_id=${user.id}`, { headers })
+                        .then(r => {
+                            if (r.data.success) {
+                                const summary = r.data.data?.summary || [];
+                                const match = summary.find(s => s.type === active.insurance_type);
+                                setPolicyBalance(match ? match.remaining_balance : null);
+                            }
+                        }).catch(() => {});
+                }
+            }).catch(() => {});
+    }, [user?.id]);
+
+    // ── Keep activeChatRef in sync ───────────────────────────────────────
+    useEffect(() => { activeChatRef.current = activeChat; }, [activeChat]);
+
+    // ── Fetch doctors (once) ─────────────────────────────────────────────
     const fetchDoctors = async () => {
         try {
             const res = await axios.get(`/api/v1/doctors`);
             if (res.data.data) {
-                // Map the backend structure to our UI structure
                 const formattedDoctors = res.data.data.map(doc => ({
                     id: doc.id,
                     name: doc.name,
                     specialist: doc.specialist,
-                    rating: 4.8 + (Math.random() * 0.2), // Mock rating since DB doesn't have it
-                    exp: Math.floor(Math.random() * 15 + 5) + " Tahun", // Mock experience
+                    rating: 4.8 + (Math.random() * 0.2),
+                    exp: Math.floor(Math.random() * 15 + 5) + " Tahun",
                     status: doc.availability === "available" ? "Tersedia" : "Sibuk",
                     originalData: doc
                 }));
@@ -44,82 +98,205 @@ export default function Konsultasi({ user }) {
         }
     };
 
-    useEffect(() => {
-        fetchDoctors();
-    }, []);
+    useEffect(() => { fetchDoctors(); }, []);
 
-    const fetchConsultations = async () => {
-        setLoading(true);
+    // ── Central polling: consultations + messages ────────────────────────
+    // Runs every 3 seconds always (not just when tab is open).
+    // Updates consultation list AND syncs activeChat status/messages.
+    const fetchConsultations = async (silent = false) => {
+        if (!silent) setLoading(true);
         try {
             const token = localStorage.getItem("mefasafe_token");
             const res = await axios.get(`/api/v1/doctor-consultations`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             if (res.data.data) {
-                // filter by current user
                 const userConsults = res.data.data.filter(c => c.user_id === user.id);
                 setConsultations(userConsults);
+
+                // Sync activeChat if open
+                const current = activeChatRef.current;
+                if (current) {
+                    const updated = userConsults.find(c => c.id === current.id);
+                    if (updated) {
+                        // Sync status changes (e.g. admin approved/completed)
+                        setActiveChat(prev => ({ ...prev, status: updated.status }));
+
+                        // Sync messages
+                        const newMsgs = updated.messages || [];
+                        if (newMsgs.length > prevMsgCount.current) {
+                            prevMsgCount.current = newMsgs.length;
+                            setMessages(newMsgs);
+                            setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+                        }
+                    }
+                }
             }
         } catch (error) {
             console.error("Failed to fetch consultations", error);
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     };
 
-    useEffect(() => {
-        if (activeTab === "history" || activeChat) {
-            fetchConsultations();
-        }
-    }, [activeTab]);
+    // Initial load
+    useEffect(() => { if (user?.id) fetchConsultations(); }, [user?.id]);
 
-    const bookConsultation = async (type) => {
-        if (!selectedDoctor) return;
+    // Polling every 3 seconds
+    useEffect(() => {
+        if (!user?.id) return;
+        const interval = setInterval(() => fetchConsultations(true), 3000);
+        return () => clearInterval(interval);
+    }, [user?.id]);
+
+    // Open booking modal (reset to step 1)
+    const openBookingModal = (doc) => {
+        setSelectedDoctor(doc);
+        setBookingStep(1);
+        setBookingType(null);
+        setPaymentMethod(null);
+        setBookingError("");
+        setPendingConsultId(null);
+        setProofFile(null);
+    };
+
+    const handleSelectType = (type) => {
+        setBookingType(type);
+        setBookingStep(2);
+        setBookingError("");
+    };
+
+    const copyNorek = (norek) => {
+        navigator.clipboard.writeText(norek).then(() => {
+            setCopiedNorek(norek);
+            setTimeout(() => setCopiedNorek(null), 2000);
+        });
+    };
+
+    const bookConsultation = async () => {
+        if (!selectedDoctor || !bookingType || !paymentMethod) return;
+        setBookingLoading(true);
+        setBookingError("");
         try {
             const token = localStorage.getItem("mefasafe_token");
-            const res = await axios.post(`/api/v1/doctor-consultations`, {
+            const payload = {
                 user_id: user.id,
                 doctor_name: selectedDoctor.name,
                 specialist_type: selectedDoctor.specialist,
-                consultation_type: type,
-                payment_status: "pending",
-                session_duration_minutes: 45
-            }, {
+                consultation_type: bookingType,
+                payment_method: paymentMethod,
+                session_duration_minutes: 45,
+            };
+            if (paymentMethod === "saldo_asuransi" && userPolicy) {
+                payload.insurance_policy_id = userPolicy.id;
+            }
+
+            const res = await axios.post(`/api/v1/doctor-consultations`, payload, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
             if (res.status === 201) {
-                setSelectedDoctor(null);
-                setActiveTab("history");
-                alert("Konsultasi berhasil dibuat! Admin/Dokter akan segera menghubungi Anda.");
+                if (paymentMethod === "transfer") {
+                    // Lanjut ke step upload bukti
+                    setPendingConsultId(res.data.data.id);
+                    setBookingStep(3);
+                    // Refresh saldo jika pakai asuransi
+                } else {
+                    // Saldo asuransi — langsung selesai
+                    if (userPolicy) {
+                        setPolicyBalance(prev => prev !== null ? prev - CONSULTATION_PRICE : null);
+                    }
+                    setSelectedDoctor(null);
+                    setBookingStep(1);
+                    setBookingType(null);
+                    setPaymentMethod(null);
+                    setActiveTab("history");
+                    fetchConsultations(true);
+                }
             }
-        } catch (error) {
-            console.error("Booking error", error);
-            alert("Gagal membuat konsultasi.");
+        } catch (err) {
+            const msg = err?.response?.data?.message || "Gagal membuat konsultasi.";
+            setBookingError(msg);
+        } finally {
+            setBookingLoading(false);
         }
     };
 
-    const fetchMessages = async (consultationId) => {
+    const uploadProof = async () => {
+        if (!proofFile || !pendingConsultId) return;
+        setUploadLoading(true);
+        setBookingError("");
         try {
             const token = localStorage.getItem("mefasafe_token");
-            const res = await axios.get(`/api/v1/doctor-consultations/${consultationId}/messages`, {
-                headers: { Authorization: `Bearer ${token}` }
+            const formData = new FormData();
+            formData.append("payment_proof", proofFile);
+            await axios.post(`/api/v1/doctor-consultations/${pendingConsultId}/upload-proof`, formData, {
+                headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" }
             });
-            setMessages(res.data.data || []);
-            scrollToBottom();
-        } catch (error) {
-            console.error("Failed to fetch messages", error);
+            setSelectedDoctor(null);
+            setBookingStep(1);
+            setBookingType(null);
+            setPaymentMethod(null);
+            setPendingConsultId(null);
+            setProofFile(null);
+            setActiveTab("history");
+            fetchConsultations(true);
+        } catch (err) {
+            setBookingError(err?.response?.data?.message || "Gagal upload bukti transfer.");
+        } finally {
+            setUploadLoading(false);
         }
     };
+
+    const [sessionExpired, setSessionExpired] = useState(false);
+    const [timeLeft, setTimeLeft] = useState(null);
+
+    // ── Session Timer ────────────────────────────────────────────────────
+    useEffect(() => {
+        if (!activeChat) {
+            setSessionExpired(false);
+            setTimeLeft(null);
+            return;
+        }
+
+        const isEnded = activeChat.status === "completed" || activeChat.status === "rejected";
+        if (isEnded) {
+            setSessionExpired(true);
+            setTimeLeft(0);
+            return;
+        }
+
+        const startedAt = new Date(activeChat.created_at).getTime();
+        const durationMs = (activeChat.session_duration_minutes || 45) * 60 * 1000;
+        const endsAt = startedAt + durationMs;
+
+        const tick = () => {
+            const remaining = Math.max(0, Math.floor((endsAt - Date.now()) / 1000));
+            setTimeLeft(remaining);
+            if (remaining === 0) {
+                setSessionExpired(true);
+                // Auto-mark as completed on backend
+                const token = localStorage.getItem("mefasafe_token");
+                axios.put(`/api/v1/doctor-consultations/${activeChat.id}`, { status: "completed" }, {
+                    headers: { Authorization: `Bearer ${token}` },
+                }).catch(() => {});
+            }
+        };
+
+        tick();
+        const timer = setInterval(tick, 1000);
+        return () => clearInterval(timer);
+    }, [activeChat?.id, activeChat?.status]);
 
     const sendMessage = async (e) => {
         e.preventDefault();
         if (!newMessage.trim() || !activeChat) return;
+        if (sessionExpired || activeChat.status === "completed" || activeChat.status === "rejected") return;
 
         try {
             const token = localStorage.getItem("mefasafe_token");
             const msg = newMessage;
-            setNewMessage(""); // optimistic clear
+            setNewMessage("");
 
             await axios.post(`/api/v1/doctor-consultations/${activeChat.id}/messages`, {
                 sender: "user",
@@ -127,21 +304,6 @@ export default function Konsultasi({ user }) {
             }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-
-            // Re-fetch messages
-            fetchMessages(activeChat.id);
-
-            // Mock auto reply from admin after 2 seconds
-            setTimeout(async () => {
-                await axios.post(`http://127.0.0.1:8000/api/v1/doctor-consultations/${activeChat.id}/messages`, {
-                    sender: "admin",
-                    message: "Baik, dokter akan segera merespon keluhan Anda. Mohon tunggu sebentar ya."
-                }, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                if (activeChat) fetchMessages(activeChat.id);
-            }, 2000);
-
         } catch (error) {
             console.error("Failed to send message", error);
             alert("Gagal mengirim pesan.");
@@ -149,8 +311,10 @@ export default function Konsultasi({ user }) {
     };
 
     const openChat = (consultation) => {
+        prevMsgCount.current = (consultation.messages || []).length;
+        setMessages(consultation.messages || []);
         setActiveChat(consultation);
-        fetchMessages(consultation.id);
+        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
     };
 
     const deleteConsultation = async () => {
@@ -175,10 +339,20 @@ export default function Konsultasi({ user }) {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
 
-    useEffect(() => {
-        scrollToBottom();
-    }, [messages]);
+    // Determine if chat is locked
+    const isChatLocked = sessionExpired
+        || activeChat?.status === "completed"
+        || activeChat?.status === "rejected"
+        || activeChat?.status === "waiting_approval";
 
+
+    // Helper: format seconds → MM:SS
+    const formatTime = (secs) => {
+        if (secs === null) return "";
+        const m = Math.floor(secs / 60).toString().padStart(2, "0");
+        const s = (secs % 60).toString().padStart(2, "0");
+        return `${m}:${s}`;
+    };
 
     // Render Chat View
     if (activeChat) {
@@ -198,7 +372,7 @@ export default function Konsultasi({ user }) {
                                 <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-xl font-bold backdrop-blur-sm border-2 border-white/50">
                                     <Stethoscope className="w-6 h-6 text-white" />
                                 </div>
-                                <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-400 rounded-full border-2 border-purple-600"></div>
+                                <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-purple-600 ${isChatLocked ? "bg-gray-400" : "bg-green-400"}`}></div>
                             </div>
                             <div>
                                 <h2 className="font-bold text-lg leading-tight">{activeChat.doctor_name}</h2>
@@ -209,7 +383,21 @@ export default function Konsultasi({ user }) {
                             </div>
                         </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2">
+                        {/* Session timer */}
+                        {!isChatLocked && timeLeft !== null && (
+                            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold
+                                ${timeLeft <= 300 ? "bg-red-500/30 text-red-100 animate-pulse" : "bg-white/10 text-white/90"}`}>
+                                <Clock className="w-4 h-4" />
+                                {formatTime(timeLeft)}
+                            </div>
+                        )}
+                        {isChatLocked && (
+                            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold bg-gray-500/30 text-white/70">
+                                <X className="w-4 h-4" />
+                                Sesi Berakhir
+                            </div>
+                        )}
                         <button className="p-2.5 bg-white/10 hover:bg-white/20 rounded-xl transition-all">
                             <Video className="w-5 h-5" />
                         </button>
@@ -253,22 +441,33 @@ export default function Konsultasi({ user }) {
 
                 {/* Chat Input */}
                 <div className="p-4 bg-white border-t border-gray-100">
-                    <form onSubmit={sendMessage} className="flex gap-2">
-                        <input 
-                            type="text" 
-                            value={newMessage}
-                            onChange={(e) => setNewMessage(e.target.value)}
-                            placeholder="Ketik keluhan Anda di sini..."
-                            className="flex-1 bg-slate-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-                        />
-                        <button 
-                            type="submit"
-                            disabled={!newMessage.trim()}
-                            className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-3 rounded-xl hover:shadow-lg disabled:opacity-50 transition-all flex items-center justify-center min-w-[50px]"
-                        >
-                            <Send className="w-5 h-5" />
-                        </button>
-                    </form>
+                    {isChatLocked ? (
+                        <div className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-slate-100 text-slate-500 text-sm font-medium">
+                            <X className="w-4 h-4" />
+                            {activeChat.status === "completed"
+                                ? "Sesi konsultasi telah selesai. Chat tidak dapat dilanjutkan."
+                                : activeChat.status === "rejected"
+                                ? "Konsultasi ditolak. Chat tidak tersedia."
+                                : "Waktu sesi 45 menit telah habis. Chat ditutup."}
+                        </div>
+                    ) : (
+                        <form onSubmit={sendMessage} className="flex gap-2">
+                            <input 
+                                type="text" 
+                                value={newMessage}
+                                onChange={(e) => setNewMessage(e.target.value)}
+                                placeholder="Ketik keluhan Anda di sini..."
+                                className="flex-1 bg-slate-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                            />
+                            <button 
+                                type="submit"
+                                disabled={!newMessage.trim()}
+                                className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-3 rounded-xl hover:shadow-lg disabled:opacity-50 transition-all flex items-center justify-center min-w-[50px]"
+                            >
+                                <Send className="w-5 h-5" />
+                            </button>
+                        </form>
+                    )}
                 </div>
             </div>
         );
@@ -368,7 +567,7 @@ export default function Konsultasi({ user }) {
                                     </div>
                                     <div className="grid grid-cols-2 gap-3">
                                         <button 
-                                            onClick={() => setSelectedDoctor(doc)}
+                                            onClick={() => openBookingModal(doc)}
                                             className="col-span-2 bg-gradient-to-r from-purple-50 to-blue-50 text-purple-700 font-semibold py-3 rounded-xl hover:from-purple-600 hover:to-blue-600 hover:text-white transition-all duration-300 border border-purple-100 hover:border-transparent flex items-center justify-center gap-2"
                                         >
                                             <MessageSquare className="w-4 h-4" />
@@ -430,6 +629,24 @@ export default function Konsultasi({ user }) {
                                                      c.status === 'approved' ? 'Berlangsung' : 
                                                      c.status === 'completed' ? 'Selesai' : c.status}
                                                 </span>
+                                                {/* Payment badge */}
+                                                <span className={`px-3 py-1 rounded-full font-medium text-xs border ${
+                                                    c.payment_status === 'paid'
+                                                        ? 'bg-green-50 text-green-700 border-green-200'
+                                                        : c.payment_status === 'pending' && c.payment_method === 'transfer'
+                                                        ? 'bg-blue-50 text-blue-600 border-blue-200'
+                                                        : c.payment_status === 'failed'
+                                                        ? 'bg-red-50 text-red-600 border-red-200'
+                                                        : 'bg-red-50 text-red-600 border-red-200'
+                                                }`}>
+                                                    {c.payment_status === 'paid'
+                                                        ? '✓ Lunas'
+                                                        : c.payment_status === 'pending' && c.payment_method === 'transfer'
+                                                        ? '⏳ Verifikasi Transfer'
+                                                        : c.payment_status === 'failed'
+                                                        ? '✖ Ditolak'
+                                                        : '⚠ Belum Bayar'}
+                                                </span>
                                                 <span className="text-gray-400 flex items-center gap-1">
                                                     <Calendar className="w-4 h-4" />
                                                     {new Date(c.created_at).toLocaleDateString('id-ID', {day: 'numeric', month: 'short', year: 'numeric'})}
@@ -437,7 +654,23 @@ export default function Konsultasi({ user }) {
                                             </div>
                                             
                                             <div className="flex items-center gap-2 mt-2">
-                                                {(c.status === 'approved' || c.status === 'waiting_approval') && (
+                                                {/* Belum bayar → tombol bayar (sembunyikan jika sudah upload bukti transfer) */}
+                                                {c.payment_status === 'pending' && c.payment_method !== 'transfer' && (
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedDoctor({ name: c.doctor_name, specialist: c.specialist_type });
+                                                            setBookingStep(2);
+                                                            setBookingType(c.consultation_type);
+                                                            setPaymentMethod(null);
+                                                        }}
+                                                        className="px-5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-medium rounded-xl hover:shadow-md transition-all text-sm flex items-center gap-2"
+                                                    >
+                                                        <CreditCard className="w-4 h-4" />
+                                                        Bayar Sekarang
+                                                    </button>
+                                                )}
+                                                {/* Sudah bayar → buka chat */}
+                                                {c.payment_status === 'paid' && (c.status === 'approved' || c.status === 'waiting_approval') && (
                                                     <button 
                                                         onClick={() => openChat(c)}
                                                         className="px-5 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-medium rounded-xl hover:shadow-md transition-all text-sm flex items-center gap-2"
@@ -475,59 +708,279 @@ export default function Konsultasi({ user }) {
             {/* Booking Modal Overlay - Portal ke document.body */}
             {selectedDoctor && createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-                    <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
-                        <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-6 text-white text-center">
-                            <h3 className="text-xl font-bold">Konfirmasi Konsultasi</h3>
-                            <p className="text-purple-100 text-sm mt-1">Pilih metode konsultasi Anda</p>
-                        </div>
-                        <div className="p-6">
-                            <div className="flex items-center gap-4 mb-6 p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                                <div className="w-16 h-16 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-sm flex-shrink-0"
-                                    style={{ background: `hsl(${(selectedDoctor.name.charCodeAt(3) || 200) * 5 % 360}, 65%, 50%)` }}>
-                                    {selectedDoctor.name.split(' ').slice(1, 3).map(w => w[0]).join('').toUpperCase() || selectedDoctor.name.substring(0, 2).toUpperCase()}
-                                </div>
-                                <div>
-                                    <h4 className="font-bold text-gray-900">{selectedDoctor.name}</h4>
-                                    <p className="text-purple-600 text-sm">{selectedDoctor.specialist}</p>
-                                </div>
-                            </div>
+                    <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
 
-                            <div className="space-y-4">
-                                <div className="p-4 rounded-2xl border border-purple-200 bg-purple-50 flex items-start gap-3">
-                                    <AlertCircle className="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" />
-                                    <p className="text-sm text-purple-800">
-                                        Durasi sesi konsultasi adalah <strong className="font-bold">45 menit</strong>. Admin/Dokter akan segera merespon setelah pengajuan dibuat.
-                                    </p>
+                        {/* ── STEP 1: Pilih Tipe Konsultasi ── */}
+                        {bookingStep === 1 && (
+                            <>
+                                <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-6 text-white text-center">
+                                    <h3 className="text-xl font-bold">Mulai Konsultasi</h3>
+                                    <p className="text-purple-100 text-sm mt-1">Pilih metode konsultasi Anda</p>
+                                </div>
+                                <div className="p-6 overflow-y-auto">
+                                    <div className="flex items-center gap-4 mb-6 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                                        <div className="w-16 h-16 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-sm flex-shrink-0"
+                                            style={{ background: `hsl(${(selectedDoctor.name.charCodeAt(3) || 200) * 5 % 360}, 65%, 50%)` }}>
+                                            {selectedDoctor.name.split(' ').slice(1, 3).map(w => w[0]).join('').toUpperCase() || selectedDoctor.name.substring(0, 2).toUpperCase()}
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-gray-900">{selectedDoctor.name}</h4>
+                                            <p className="text-purple-600 text-sm">{selectedDoctor.specialist}</p>
+                                        </div>
+                                    </div>
+                                    <div className="p-4 rounded-2xl border border-purple-200 bg-purple-50 flex items-start gap-3 mb-4">
+                                        <AlertCircle className="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" />
+                                        <p className="text-sm text-purple-800">
+                                            Durasi sesi <strong>45 menit</strong>. Biaya konsultasi <strong>{formatRupiah(CONSULTATION_PRICE)}</strong> per sesi.
+                                        </p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button onClick={() => handleSelectType("chat")}
+                                            className="flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-gray-200 hover:border-purple-500 hover:bg-purple-50 transition-all group">
+                                            <MessageSquare className="w-8 h-8 text-gray-400 group-hover:text-purple-600 mb-2 transition-colors" />
+                                            <span className="font-semibold text-gray-700 group-hover:text-purple-700">Chat</span>
+                                            <span className="text-xs text-gray-400 mt-0.5">{formatRupiah(CONSULTATION_PRICE)}</span>
+                                        </button>
+                                        <button disabled className="flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-gray-200 opacity-50 cursor-not-allowed">
+                                            <Video className="w-8 h-8 text-gray-400 mb-2" />
+                                            <span className="font-semibold text-gray-700">Video Call</span>
+                                            <span className="text-[10px] bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full mt-1">Segera</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="p-4 border-t border-gray-100">
+                                    <button onClick={() => setSelectedDoctor(null)}
+                                        className="w-full py-3 font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all">
+                                        Batal
+                                    </button>
+                                </div>
+                            </>
+                        )}
+
+                        {/* ── STEP 2: Pembayaran ── */}
+                        {bookingStep === 2 && (
+                            <>
+                                <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-6 text-white">
+                                    <button onClick={() => { setBookingStep(1); setBookingError(""); }}
+                                        className="flex items-center gap-1.5 text-purple-200 hover:text-white text-sm mb-3 transition-colors">
+                                        <ArrowLeft className="w-4 h-4" /> Kembali
+                                    </button>
+                                    <h3 className="text-xl font-bold">Pembayaran Konsultasi</h3>
+                                    <p className="text-purple-100 text-sm mt-1">Selesaikan pembayaran untuk memulai sesi</p>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-3 pt-2">
-                                    <button 
-                                        onClick={() => bookConsultation("chat")}
-                                        className="flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-gray-200 hover:border-purple-500 hover:bg-purple-50 transition-all group"
-                                    >
-                                        <MessageSquare className="w-8 h-8 text-gray-400 group-hover:text-purple-600 mb-2 transition-colors" />
-                                        <span className="font-semibold text-gray-700 group-hover:text-purple-700">Chat</span>
+                                <div className="p-6 space-y-5 overflow-y-auto">
+                                    {/* Ringkasan */}
+                                    <div className="rounded-2xl border border-gray-100 bg-gray-50 divide-y divide-gray-100">
+                                        {[
+                                            ["Dokter", selectedDoctor.name],
+                                            ["Spesialisasi", selectedDoctor.specialist],
+                                            ["Metode", bookingType === "chat" ? "Chat" : "Video Call"],
+                                            ["Durasi", "45 Menit"],
+                                        ].map(([label, val]) => (
+                                            <div key={label} className="flex justify-between items-center px-4 py-3 text-sm">
+                                                <span className="text-gray-500">{label}</span>
+                                                <span className="font-semibold text-gray-800">{val}</span>
+                                            </div>
+                                        ))}
+                                        <div className="flex justify-between items-center px-4 py-3">
+                                            <span className="font-bold text-gray-900">Total Bayar</span>
+                                            <span className="font-black text-purple-600 text-lg">{formatRupiah(CONSULTATION_PRICE)}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Error */}
+                                    {bookingError && (
+                                        <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 text-xs px-4 py-3 rounded-xl">
+                                            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                            {bookingError}
+                                        </div>
+                                    )}
+
+                                    {/* Pilih Metode Bayar */}
+                                    <div>
+                                        <p className="text-sm font-bold text-gray-700 mb-3">Pilih Metode Pembayaran</p>
+                                        <div className="space-y-2.5">
+                                            {/* Saldo Asuransi */}
+                                            <button onClick={() => setPaymentMethod("saldo_asuransi")}
+                                                className={`w-full flex items-start gap-4 p-4 rounded-2xl border-2 transition-all text-left ${
+                                                    paymentMethod === "saldo_asuransi" ? "border-purple-500 bg-purple-50" : "border-gray-200 hover:border-purple-300 bg-white"
+                                                }`}>
+                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                                                    paymentMethod === "saldo_asuransi" ? "bg-purple-500 text-white" : "bg-gray-100 text-gray-500"
+                                                }`}>
+                                                    <Wallet className="w-5 h-5" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className={`font-semibold text-sm ${paymentMethod === "saldo_asuransi" ? "text-purple-800" : "text-gray-800"}`}>
+                                                        Saldo Asuransi MefaSafe
+                                                    </p>
+                                                    {userPolicy ? (
+                                                        <div className="mt-1 space-y-0.5">
+                                                            <p className="text-xs text-gray-500">
+                                                                Polis: <span className="font-semibold">{userPolicy.policy_number}</span>
+                                                                {" · "}<span className="capitalize">{userPolicy.insurance_type}</span>
+                                                            </p>
+                                                            {policyBalance !== null && (
+                                                                <p className="text-xs">
+                                                                    Saldo:{" "}
+                                                                    <span className={`font-bold ${policyBalance < CONSULTATION_PRICE ? "text-red-500" : "text-emerald-600"}`}>
+                                                                        {formatRupiah(policyBalance)}
+                                                                    </span>
+                                                                    {paymentMethod === "saldo_asuransi" && policyBalance >= CONSULTATION_PRICE && (
+                                                                        <span className="text-gray-400"> → {formatRupiah(policyBalance - CONSULTATION_PRICE)}</span>
+                                                                    )}
+                                                                </p>
+                                                            )}
+                                                            {policyBalance !== null && policyBalance < CONSULTATION_PRICE && (
+                                                                <p className="text-xs text-red-500 font-medium">Saldo tidak mencukupi</p>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <p className="text-xs text-amber-600 mt-1">Tidak ada polis aktif</p>
+                                                    )}
+                                                </div>
+                                                {paymentMethod === "saldo_asuransi" && <BadgeCheck className="w-5 h-5 text-purple-500 shrink-0 mt-1" />}
+                                            </button>
+
+                                            {/* Transfer Bank */}
+                                            <button onClick={() => setPaymentMethod("transfer")}
+                                                className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-left ${
+                                                    paymentMethod === "transfer" ? "border-purple-500 bg-purple-50" : "border-gray-200 hover:border-purple-300 bg-white"
+                                                }`}>
+                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                                                    paymentMethod === "transfer" ? "bg-purple-500 text-white" : "bg-gray-100 text-gray-500"
+                                                }`}>
+                                                    <CreditCard className="w-5 h-5" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className={`font-semibold text-sm ${paymentMethod === "transfer" ? "text-purple-800" : "text-gray-800"}`}>
+                                                        Transfer Bank / Virtual Account
+                                                    </p>
+                                                    <p className="text-xs text-gray-400 mt-0.5">BCA, Mandiri, BNI — upload bukti, tunggu verifikasi admin</p>
+                                                </div>
+                                                {paymentMethod === "transfer" && <BadgeCheck className="w-5 h-5 text-purple-500 shrink-0" />}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="p-4 border-t border-gray-100 flex gap-3">
+                                    <button onClick={() => setSelectedDoctor(null)}
+                                        className="flex-1 py-3 font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all">
+                                        Batal
                                     </button>
-                                    <button 
-                                        onClick={() => bookConsultation("call")}
-                                        className="flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-gray-200 hover:border-purple-500 hover:bg-purple-50 transition-all group opacity-50 cursor-not-allowed"
-                                        title="Fitur ini akan segera hadir"
-                                    >
-                                        <Video className="w-8 h-8 text-gray-400 mb-2" />
-                                        <span className="font-semibold text-gray-700">Video Call</span>
-                                        <span className="text-[10px] bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full mt-1">Segera</span>
+                                    <button onClick={bookConsultation}
+                                        disabled={!paymentMethod || bookingLoading || (paymentMethod === "saldo_asuransi" && (!userPolicy || policyBalance < CONSULTATION_PRICE))}
+                                        className="flex-1 py-3 font-bold text-white bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                                        {bookingLoading ? (
+                                            <><Loader2 className="w-4 h-4 animate-spin" /> Memproses...</>
+                                        ) : paymentMethod === "transfer" ? (
+                                            <><CreditCard className="w-4 h-4" /> Lanjut ke Transfer</>
+                                        ) : (
+                                            <><CheckCircle2 className="w-4 h-4" /> Bayar & Mulai</>
+                                        )}
                                     </button>
                                 </div>
-                            </div>
-                        </div>
-                        <div className="p-4 border-t border-gray-100 flex gap-3">
-                            <button 
-                                onClick={() => setSelectedDoctor(null)}
-                                className="flex-1 py-3 px-4 font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all"
-                            >
-                                Batal
-                            </button>
-                        </div>
+                            </>
+                        )}
+
+                        {/* ── STEP 3: Upload Bukti Transfer ── */}
+                        {bookingStep === 3 && (
+                            <>
+                                <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-6 text-white">
+                                    <h3 className="text-xl font-bold">Upload Bukti Transfer</h3>
+                                    <p className="text-purple-100 text-sm mt-1">Transfer ke salah satu rekening berikut, lalu upload buktinya</p>
+                                </div>
+
+                                <div className="p-6 space-y-5 overflow-y-auto">
+                                    {/* Nominal */}
+                                    <div className="rounded-2xl bg-purple-50 border border-purple-200 p-4 text-center">
+                                        <p className="text-xs text-purple-600 font-semibold uppercase tracking-wide mb-1">Nominal Transfer</p>
+                                        <p className="text-3xl font-black text-purple-700">{formatRupiah(CONSULTATION_PRICE)}</p>
+                                        <p className="text-xs text-purple-500 mt-1">Pastikan nominal tepat agar verifikasi lebih cepat</p>
+                                    </div>
+
+                                    {/* Rekening */}
+                                    <div>
+                                        <p className="text-sm font-bold text-gray-700 mb-3">Rekening Tujuan</p>
+                                        <div className="space-y-2.5">
+                                            {BANK_ACCOUNTS.map(acc => (
+                                                <div key={acc.bank} className="flex items-center gap-3 p-4 rounded-2xl border border-gray-200 bg-white">
+                                                    <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+                                                        <Building2 className="w-5 h-5 text-blue-600" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="font-bold text-gray-900 text-sm">{acc.bank}</p>
+                                                        <p className="text-base font-mono font-semibold text-gray-700 tracking-wider">{acc.norek}</p>
+                                                        <p className="text-xs text-gray-400">{acc.atas_nama}</p>
+                                                    </div>
+                                                    <button onClick={() => copyNorek(acc.norek)}
+                                                        className={`p-2 rounded-xl transition-all ${copiedNorek === acc.norek ? "bg-green-100 text-green-600" : "bg-gray-100 hover:bg-gray-200 text-gray-500"}`}
+                                                        title="Salin nomor rekening">
+                                                        {copiedNorek === acc.norek ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Upload Bukti */}
+                                    <div>
+                                        <p className="text-sm font-bold text-gray-700 mb-3">Upload Bukti Transfer</p>
+                                        <label className={`flex flex-col items-center justify-center w-full h-32 rounded-2xl border-2 border-dashed cursor-pointer transition-all ${
+                                            proofFile ? "border-purple-400 bg-purple-50" : "border-gray-300 bg-gray-50 hover:border-purple-400 hover:bg-purple-50"
+                                        }`}>
+                                            <input type="file" className="hidden" accept="image/*,.pdf"
+                                                onChange={e => setProofFile(e.target.files[0] || null)} />
+                                            {proofFile ? (
+                                                <div className="text-center px-4">
+                                                    <CheckCircle2 className="w-8 h-8 text-purple-500 mx-auto mb-1" />
+                                                    <p className="text-sm font-semibold text-purple-700 truncate max-w-[220px]">{proofFile.name}</p>
+                                                    <p className="text-xs text-gray-400 mt-0.5">Klik untuk ganti file</p>
+                                                </div>
+                                            ) : (
+                                                <div className="text-center">
+                                                    <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                                                    <p className="text-sm text-gray-500">Klik untuk upload bukti transfer</p>
+                                                    <p className="text-xs text-gray-400 mt-0.5">JPG, PNG, atau PDF · Maks 5MB</p>
+                                                </div>
+                                            )}
+                                        </label>
+                                    </div>
+
+                                    {/* Info verifikasi */}
+                                    <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 text-amber-800 text-xs p-4 rounded-xl">
+                                        <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
+                                        <span>Setelah upload, admin akan memverifikasi pembayaran Anda. Chat akan terbuka setelah verifikasi selesai (biasanya dalam 1×24 jam).</span>
+                                    </div>
+
+                                    {/* Error */}
+                                    {bookingError && (
+                                        <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 text-xs px-4 py-3 rounded-xl">
+                                            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                            {bookingError}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="p-4 border-t border-gray-100 flex gap-3">
+                                    <button onClick={() => setSelectedDoctor(null)}
+                                        className="flex-1 py-3 font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all">
+                                        Nanti Saja
+                                    </button>
+                                    <button onClick={uploadProof}
+                                        disabled={!proofFile || uploadLoading}
+                                        className="flex-1 py-3 font-bold text-white bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                                        {uploadLoading ? (
+                                            <><Loader2 className="w-4 h-4 animate-spin" /> Mengupload...</>
+                                        ) : (
+                                            <><Upload className="w-4 h-4" /> Kirim Bukti</>
+                                        )}
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>,
                 document.body

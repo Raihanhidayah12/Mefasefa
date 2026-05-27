@@ -28,8 +28,14 @@ class InsurancePolicyController extends Controller
 
         $policies = InsurancePolicy::query()
             ->where('user_id', $user->id)
+            ->with('claims')
             ->orderByDesc('id')
-            ->get();
+            ->get()
+            ->map(function ($policy) {
+                $totalApprovedClaims = $policy->claims->whereIn('status', ['approved', 'partial'])->sum('claim_amount');
+                $policy->remaining_limit = max(0, $policy->coverage_limit - $totalApprovedClaims);
+                return $policy;
+            });
 
         return response()->json([
             'message' => 'User policies retrieved successfully.',
