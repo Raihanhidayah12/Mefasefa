@@ -18,9 +18,9 @@ Tahun Akademik 2025/2026
 
 ## 📋 Deskripsi Proyek
 
-**MefaSafe** adalah platform asuransi kesehatan digital berbasis web yang memungkinkan pengguna mengelola polis asuransi, mengajukan klaim, mendaftar ke rumah sakit, berkonsultasi dengan dokter, memantau kesehatan, dan mendapatkan pengingat jadwal kontrol — semuanya dalam satu aplikasi yang modern dan responsif.
+**MefaSafe** adalah platform asuransi kesehatan digital berbasis web yang memungkinkan pengguna mengelola polis asuransi, mengajukan klaim, mendaftar ke rumah sakit, berkonsultasi dengan dokter, memantau kesehatan, memanfaatkan promo & referral, serta mendapatkan pengingat jadwal kontrol — semuanya dalam satu aplikasi yang modern dan responsif.
 
-Dibangun menggunakan **Laravel 11** sebagai backend REST API dan **React 19** sebagai Single Page Application (SPA) di frontend, dengan desain glassmorphism dan animasi modern.
+Dibangun menggunakan **Laravel 13** sebagai backend REST API dan **React 19** sebagai Single Page Application (SPA) di frontend, dengan desain glassmorphism, carousel banner ala aplikasi kesehatan modern, dan panel admin terpusat.
 
 ---
 
@@ -36,13 +36,28 @@ Dibangun menggunakan **Laravel 11** sebagai backend REST API dan **React 19** se
 - Saldo asuransi real-time dengan toggle visibilitas
 - Status polis aktif/tidak aktif + tanggal kadaluarsa
 - Statistik: perlindungan, klaim disetujui, member aktif, rating
-- Akses cepat ke semua layanan (8 menu utama)
+- **Banner carousel** — gabungan promo & informasi (gaya Halodoc)
+- **Testimonial** — "Kata Mereka tentang MefaSafe" dari feedback yang disetujui admin
+- Akses cepat ke semua layanan
 - Notifikasi pengingat dengan badge counter
+
+### 🎁 Promo, Referral & Kode Diskon
+- **Program referral** — kode unik per pengguna, input kode teman, kupon diskon otomatis
+- Pengaturan promo oleh admin: persentase diskon, minimal referral, upload gambar banner
+- Halaman **Promo** (`/promo`) — info program, carousel, form apply referral
+- **Kode promo pembayaran** — admin buat kode untuk fitur tertentu (asuransi, konsultasi, pendaftaran layanan, dll.)
+- Input kode promo di alur pembayaran: Health Service, Konsultasi, Pendaftaran Layanan
+- Validasi kode via API sebelum checkout
+
+### 📢 Informasi & Banner
+- Admin kelola **pengumuman/informasi** terpisah dari promo (judul, gambar, urutan tampil)
+- API `/banners/active` menggabungkan promo + informasi aktif untuk carousel dashboard
 
 ### 🛡️ Manajemen Asuransi
 - Lihat semua polis aktif milik pengguna
-- Paket asuransi tersedia (Basic, Standard, Premium, Komprehensif)
+- Paket asuransi tersedia (aktif/nonaktif dikelola admin)
 - Detail coverage, premi, dan periode perlindungan
+- Pembelian polis dengan diskon kode promo
 
 ### 💰 Klaim Asuransi
 - Pengajuan klaim dengan upload dokumen pendukung
@@ -62,11 +77,13 @@ Dibangun menggunakan **Laravel 11** sebagai backend REST API dan **React 19** se
 - Status ketersediaan dokter real-time
 - Chat konsultasi dengan sistem pesan
 - Riwayat konsultasi + hapus konsultasi
+- Pembayaran konsultasi dengan kode promo
 
 ### 📋 Pendaftaran Layanan Kesehatan
 - Layanan dinamis dari database (MCU, Lab, Fisioterapi, dll.)
 - Pilih jadwal, waktu, dan catatan tambahan
 - Nomor antrian dan barcode otomatis
+- Input kode promo saat pembayaran
 
 ### 📊 Monitor Asuransi
 - Grafik statistik polis dan klaim dengan **Recharts**
@@ -95,10 +112,24 @@ Dibangun menggunakan **Laravel 11** sebagai backend REST API dan **React 19** se
 
 ### 💬 Feedback & Rating
 - Formulir masukan pengguna dengan kategori dan rating bintang
+- Admin menyetujui feedback untuk ditampilkan di homepage (`is_featured`)
 
-### ℹ️ Halaman Informasi
-- **Tentang Kami**: profil MefaSafe, visi misi, tim pengembang
+### ℹ️ Halaman Informasi & Dukungan
+- **Tentang Kami** — fitur platform, tim, tech stack, CTA
 - **Pusat Bantuan**, **FAQ**, **Syarat & Ketentuan**, **Kebijakan Privasi**
+- **Peta Situs** — navigasi cepat ke semua halaman aplikasi
+- **Kebijakan Cookie** — penjelasan cookie & local storage
+- **Aksesibilitas** — panel ukuran teks, kontras tinggi, kurangi animasi (tersimpan di perangkat)
+
+### 🛠️ Panel Admin
+- Dashboard statistik ringkas
+- CRUD: pengguna, klaim, polis, transaksi, RS, dokter, paket asuransi
+- Kelola konsultasi & verifikasi pembayaran
+- **Promo banner** — upload gambar, diskon %, syarat referral
+- **Informasi/pengumuman** — konten non-promo untuk carousel
+- **Kode promo** — kode diskon per fitur, limit penggunaan, masa berlaku
+- **Feedback** — toggle tampilkan di homepage
+- Login admin terpisah (`/admin`)
 
 ---
 
@@ -106,10 +137,10 @@ Dibangun menggunakan **Laravel 11** sebagai backend REST API dan **React 19** se
 
 | Lapisan | Teknologi |
 |---------|-----------|
-| **Backend** | Laravel 13, PHP 8.2+, Laravel Sanctum |
+| **Backend** | Laravel 13, PHP 8.3+, Laravel Sanctum |
 | **Frontend** | React 19, React Router DOM v7, Axios |
 | **Build Tool** | Vite 8 |
-| **Styling** | Tailwind CSS (utility-first) |
+| **Styling** | Tailwind CSS 4 (utility-first) |
 | **Database** | MySQL 8.0 |
 | **Peta** | Leaflet.js + React-Leaflet |
 | **Grafik** | Recharts |
@@ -125,65 +156,66 @@ Dibangun menggunakan **Laravel 11** sebagai backend REST API dan **React 19** se
 MefaSafe/
 ├── app/
 │   ├── Http/Controllers/Api/
-│   │   ├── AuthController.php              # Login & Register
-│   │   ├── UserController.php              # CRUD user & profil
-│   │   ├── HomeDashboardController.php     # Data dashboard utama
-│   │   ├── InsurancePolicyController.php   # Manajemen polis
-│   │   ├── InsurancePackageController.php  # Paket asuransi
-│   │   ├── ClaimController.php             # Pengajuan klaim
-│   │   ├── TransactionController.php       # Riwayat transaksi
-│   │   ├── HospitalController.php          # Data rumah sakit & dokter
-│   │   ├── HospitalRegistrationController.php  # Pendaftaran RS
-│   │   ├── DoctorConsultationController.php    # Konsultasi dokter
-│   │   ├── HealthServiceController.php     # Layanan kesehatan
-│   │   ├── ServiceRegistrationController.php   # Pendaftaran layanan
-│   │   ├── MonitorController.php           # Statistik & grafik
-│   │   ├── ReminderController.php          # Kalender pengingat
-│   │   ├── NotificationController.php      # Sistem notifikasi
-│   │   ├── RiwayatController.php           # Riwayat lengkap
-│   │   ├── FeedbackController.php          # Feedback pengguna
-│   │   └── ChatBotController.php           # MefaBot AI
-│   └── Models/
-│       ├── User.php, Profile.php
-│       ├── InsurancePolicy.php, InsurancePackage.php
-│       ├── Claim.php, Transaction.php
-│       ├── Hospital.php, Doctor.php
-│       ├── HospitalRegistration.php
-│       ├── DoctorConsultation.php, ConsultationMessage.php
-│       ├── HealthService.php, ServiceRegistration.php
-│       ├── Reminder.php, Feedback.php
+│   │   ├── AuthController.php
+│   │   ├── UserController.php
+│   │   ├── HomeDashboardController.php
+│   │   ├── InsurancePolicyController.php
+│   │   ├── InsurancePackageController.php
+│   │   ├── ClaimController.php
+│   │   ├── TransactionController.php
+│   │   ├── HospitalController.php
+│   │   ├── HospitalRegistrationController.php
+│   │   ├── DoctorConsultationController.php
+│   │   ├── HealthServiceController.php
+│   │   ├── ServiceRegistrationController.php
+│   │   ├── MonitorController.php
+│   │   ├── ReminderController.php
+│   │   ├── NotificationController.php
+│   │   ├── RiwayatController.php
+│   │   ├── FeedbackController.php
+│   │   ├── ChatBotController.php
+│   │   ├── PromotionController.php        # Promo aktif
+│   │   ├── AnnouncementController.php       # Informasi aktif
+│   │   ├── BannerController.php             # Gabungan banner carousel
+│   │   ├── ReferralController.php           # Referral & kupon
+│   │   ├── PromoCodeController.php          # Validasi kode promo
+│   │   └── AdminController.php              # Panel admin lengkap
+│   ├── Models/
+│   │   ├── User, Profile, InsurancePolicy, InsurancePackage
+│   │   ├── Claim, Transaction, Hospital, Doctor
+│   │   ├── HospitalRegistration, DoctorConsultation, ConsultationMessage
+│   │   ├── HealthService, ServiceRegistration, Reminder, Feedback
+│   │   ├── Promotion, Announcement
+│   │   ├── Referral, DiscountCoupon, PromoCode, PromoCodeUsage
+│   │   └── ...
+│   └── Services/
+│       └── PromoCodeService.php             # Logika validasi kode promo
 │
 ├── resources/js/components/
-│   ├── App.jsx                     # Root SPA + routing
-│   ├── Dashboard.jsx               # Shell utama + navbar + sidebar
+│   ├── App.jsx, Dashboard.jsx
 │   ├── Login.jsx, Register.jsx, TermAgreement.jsx
-│   ├── Profile.jsx                 # Manajemen profil
-│   ├── Asuransi.jsx                # Polis asuransi
-│   ├── Klaim.jsx                   # Pengajuan klaim
-│   ├── Monitor.jsx                 # Grafik & statistik
-│   ├── DaftarRS.jsx                # Peta & daftar RS
-│   ├── PendaftaranRS.jsx           # Form pendaftaran RS
-│   ├── PendaftaranLayanan.jsx      # Pendaftaran layanan kesehatan
-│   ├── Konsultasi.jsx              # Chat dokter
-│   ├── Riwayat.jsx                 # Riwayat transaksi
-│   ├── KalenderPengingat.jsx       # Kalender & pengingat
-│   ├── ReminderPopup.jsx           # Popup notifikasi pengingat
-│   ├── Notifikasi.jsx              # Pusat notifikasi
-│   ├── ChatBot.jsx                 # MefaBot UI
-│   ├── HealthService.jsx           # Health tracking
-│   ├── Feedback.jsx                # Formulir masukan
-│   ├── TentangKami.jsx             # Profil MefaSafe
-│   └── SupportPage.jsx             # Bantuan, FAQ, Kebijakan
+│   ├── Profile.jsx, Asuransi.jsx, Klaim.jsx, Monitor.jsx
+│   ├── DaftarRS.jsx, PendaftaranRS.jsx, PendaftaranLayanan.jsx
+│   ├── Konsultasi.jsx, HealthService.jsx, Riwayat.jsx
+│   ├── KalenderPengingat.jsx, ReminderPopup.jsx, Notifikasi.jsx
+│   ├── ChatBot.jsx, Feedback.jsx, TentangKami.jsx, SupportPage.jsx
+│   ├── PromoPage.jsx, BannerCarousel.jsx, UserTestimonials.jsx
+│   ├── PromoCodeInput.jsx                     # Komponen input kode promo
+│   ├── AccessibilityPanel.jsx, useAccessibility.js
+│   └── admin/
+│       ├── AdminDashboard.jsx, AdminLogin.jsx
+│       └── sections/
+│           ├── AdminPromotions.jsx, AdminAnnouncements.jsx
+│           ├── AdminPromoCodes.jsx, AdminFeedbacks.jsx
+│           └── ... (users, claims, hospitals, dll.)
 │
-├── database/
-│   ├── migrations/                 # 15+ tabel migrasi
-│   └── seeders/
-│       ├── DatabaseSeeder.php
-│       ├── HospitalSeeder.php      # 20 rumah sakit
-│       ├── DoctorSeeder.php        # Data dokter spesialis
-│       └── HealthServiceSeeder.php # Paket layanan kesehatan
+├── database/migrations/                     # 20+ migrasi termasuk promo & referral
+├── public/
+│   ├── promotions/                          # Upload banner promo
+│   ├── announcements/                       # Upload gambar informasi
+│   └── profiles/
 │
-└── routes/api.php                  # Semua API routes
+└── routes/api.php
 ```
 
 ---
@@ -194,21 +226,27 @@ MefaSafe/
 
 | Tabel | Deskripsi | Kolom Penting |
 |-------|-----------|---------------|
-| `users` | Data pengguna | `name`, `email`, `password`, `role` |
+| `users` | Data pengguna | `name`, `email`, `password`, `role`, `referral_code` |
 | `profiles` | Profil lengkap | `full_name`, `birth_info`, `address`, `identity_card_path`, `digital_signature_path`, `profile_picture` |
-| `insurance_policies` | Polis asuransi | `policy_number`, `insurance_type`, `premium_amount`, `coverage_limit`, `start_date`, `end_date`, `status` |
-| `insurance_packages` | Paket yang tersedia | `name`, `type`, `premium_amount`, `coverage_limit`, `description` |
+| `insurance_policies` | Polis asuransi | `policy_number`, `premium_amount`, `coverage_limit`, `status`, `promo_code`, `discount_amount` |
+| `insurance_packages` | Paket tersedia | `name`, `type`, `premium_amount`, `coverage_limit`, `is_active` |
 | `claims` | Pengajuan klaim | `claim_amount`, `description`, `document_path`, `status` |
 | `transactions` | Transaksi keuangan | `transaction_type`, `amount`, `transaction_date`, `status` |
 | `hospitals` | Data rumah sakit | `name`, `address`, `city`, `latitude`, `longitude`, `is_partner` |
 | `doctors` | Data dokter | `hospital_id`, `name`, `specialist`, `availability` |
 | `hospital_registrations` | Pendaftaran RS | `hospital_name`, `doctor_name`, `schedule_date`, `queue_number`, `barcode_data` |
-| `doctor_consultations` | Konsultasi dokter | `doctor_name`, `specialist_type`, `consultation_type`, `status` |
+| `doctor_consultations` | Konsultasi dokter | `doctor_name`, `specialist_type`, `status`, `promo_code`, `discount_amount` |
 | `consultation_messages` | Pesan konsultasi | `consultation_id`, `sender`, `message` |
 | `health_services` | Layanan kesehatan | `name`, `type`, `description`, `price`, `duration_minutes` |
-| `service_registrations` | Pendaftaran layanan | `health_service_id`, `schedule_date`, `schedule_time`, `queue_number`, `barcode_data`, `status` |
-| `feedbacks` | Masukan pengguna | `category`, `content`, `rating` |
-| `reminders` | Kalender pengingat | `title`, `reminder_date`, `reminder_time`, `category`, `repeat`, `is_done`, `is_notified` |
+| `service_registrations` | Pendaftaran layanan | `health_service_id`, `schedule_date`, `queue_number`, `promo_code`, `discount_amount` |
+| `feedbacks` | Masukan pengguna | `category`, `content`, `rating`, `is_featured` |
+| `reminders` | Kalender pengingat | `title`, `reminder_date`, `reminder_time`, `category`, `repeat`, `is_done` |
+| `promotions` | Banner promo | `title`, `image_path`, `discount_percent`, `required_referrals`, `is_active`, `sort_order` |
+| `announcements` | Informasi/pengumuman | `title`, `image_path`, `is_active`, `sort_order` |
+| `referrals` | Relasi referral | `referrer_id`, `referred_id`, `referral_code` |
+| `discount_coupons` | Kupon dari referral | `user_id`, `code`, `discount_percent`, `is_used` |
+| `promo_codes` | Kode promo admin | `code`, `discount_percent`, `features`, `max_uses`, `expires_at` |
+| `promo_code_usages` | Riwayat pemakaian kode | `promo_code_id`, `user_id`, `feature` |
 
 ### Relasi Utama
 
@@ -216,12 +254,14 @@ MefaSafe/
 users ──< insurance_policies ──< claims
 users ──< transactions
 users ──< hospital_registrations >── hospitals
-         hospital_registrations >── doctors
 users ──< doctor_consultations ──< consultation_messages
 users ──< service_registrations >── health_services
 users ──< feedbacks
 users ──< reminders
 users ── profiles
+users ──< referrals (sebagai referrer / referred)
+users ──< discount_coupons
+users ──< promo_code_usages >── promo_codes
 hospitals ──< doctors
 ```
 
@@ -231,7 +271,7 @@ hospitals ──< doctors
 
 ### Prasyarat
 
-- PHP >= 8.2
+- PHP >= 8.3
 - Composer
 - Node.js >= 18.x & npm
 - MySQL >= 8.0
@@ -247,13 +287,8 @@ cd Mefasefa
 ### 2. Setup Backend (Laravel)
 
 ```bash
-# Install dependencies PHP
 composer install
-
-# Salin file environment
 cp .env.example .env
-
-# Generate application key
 php artisan key:generate
 
 # Konfigurasi database di .env
@@ -261,10 +296,7 @@ php artisan key:generate
 # DB_USERNAME=root
 # DB_PASSWORD=
 
-# Jalankan migrasi + seeder
 php artisan migrate --seed
-
-# Jalankan server
 php artisan serve
 # → http://127.0.0.1:8000
 ```
@@ -272,33 +304,35 @@ php artisan serve
 ### 3. Setup Frontend (React + Vite)
 
 ```bash
-# Install dependencies JS
 npm install
-
-# Jalankan dev server
 npm run dev
 # → http://localhost:5173
 
-# Atau build untuk production
+# Production build
 npm run build
 ```
 
 ### 4. Konfigurasi Gemini AI (Opsional)
 
-Untuk mengaktifkan MefaBot dengan Gemini AI:
-
 ```env
-# Di file .env
 GEMINI_API_KEY=your_api_key_here
 ```
 
 > Tanpa API key, chatbot tetap berfungsi menggunakan fallback responses bawaan.
+
+### 5. Akses Aplikasi
+
+| Peran | URL | Catatan |
+|-------|-----|---------|
+| Pengguna | `/` → Login | Registrasi akun baru tersedia |
+| Admin | `/admin` | Login dengan akun role `admin` |
 
 ---
 
 ## 🔌 API Endpoints
 
 ### Base URL
+
 ```
 http://127.0.0.1:8000/api
 ```
@@ -314,36 +348,73 @@ http://127.0.0.1:8000/api
 
 | Method | Endpoint | Deskripsi |
 |--------|----------|-----------|
-| `GET` | `/home-dashboard` | Data dashboard utama (saldo, stats, polis) |
+| `GET` | `/home-dashboard` | Data dashboard utama |
+| `GET` | `/banners/active` | Banner carousel (promo + informasi) |
+| `GET` | `/promotions/active` | Promo aktif |
+| `GET` | `/announcements/active` | Informasi aktif |
+| `GET` | `/referrals/me` | Kode referral & status program |
+| `POST` | `/referrals/apply` | Terapkan kode referral teman |
+| `POST` | `/promo-codes/validate` | Validasi kode promo pembayaran |
+| `POST` | `/discount-coupons/validate` | Validasi kupon referral |
+| `GET` | `/feedbacks/featured` | Testimonial untuk homepage |
 | `GET` | `/my-policies` | Polis asuransi milik user |
-| `GET` | `/insurance-packages` | Daftar paket asuransi tersedia |
+| `GET` | `/insurance-packages` | Daftar paket asuransi |
 | `GET/POST` | `/claims` | Daftar & ajukan klaim |
 | `GET/POST` | `/transactions` | Riwayat & tambah transaksi |
-| `GET` | `/hospitals` | Daftar rumah sakit (+ filter mitra) |
+| `GET` | `/hospitals` | Daftar rumah sakit |
 | `GET` | `/hospitals/{id}/doctors` | Dokter di RS tertentu |
 | `GET/POST` | `/hospital-registrations` | Pendaftaran RS online |
-| `GET` | `/doctors` | Semua dokter (untuk konsultasi) |
-| `GET/POST` | `/doctor-consultations` | Buat & lihat konsultasi |
-| `DELETE` | `/doctor-consultations/{id}` | Hapus konsultasi |
+| `GET` | `/doctors` | Semua dokter |
+| `GET/POST` | `/doctor-consultations` | Konsultasi dokter |
 | `GET/POST` | `/doctor-consultations/{id}/messages` | Chat konsultasi |
-| `GET` | `/health-services` | Daftar layanan kesehatan |
-| `GET/POST` | `/service-registrations` | Pendaftaran layanan kesehatan |
-| `GET` | `/monitor` | Data grafik & statistik asuransi |
+| `GET` | `/health-services` | Layanan kesehatan |
+| `GET/POST` | `/service-registrations` | Pendaftaran layanan |
+| `GET` | `/monitor/saldo-summary` | Ringkasan saldo polis |
+| `GET` | `/monitor/claims-history` | Riwayat klaim untuk grafik |
+| `GET` | `/monitor/saldo-chart` | Data chart saldo |
 | `GET` | `/riwayat` | Riwayat lengkap user |
 | `GET` | `/notifications` | Semua notifikasi |
-| `GET` | `/notifications/summary` | Ringkasan notifikasi belum dibaca |
-| `GET/POST` | `/reminders` | Semua & buat pengingat |
-| `PUT` | `/reminders/{id}` | Update pengingat |
-| `DELETE` | `/reminders/{id}` | Hapus pengingat |
+| `GET` | `/notifications/summary` | Ringkasan belum dibaca |
+| `GET/POST/PUT/DELETE` | `/reminders` | CRUD pengingat |
 | `GET` | `/reminders/today` | Pengingat hari ini |
 | `GET` | `/reminders/upcoming` | Pengingat 7 hari ke depan |
 | `GET/POST` | `/feedbacks` | Lihat & kirim feedback |
-| `POST` | `/chatbot/chat` | Chat dengan MefaBot |
+| `POST` | `/chatbot/chat` | Chat MefaBot |
 | `GET` | `/chatbot/quick-replies` | Saran pertanyaan chatbot |
 | `GET/PUT` | `/users/{id}` | Profil user & update |
 
+### Admin (`/api/v1/admin/`) — *Butuh Auth Token Admin*
+
+| Method | Endpoint | Deskripsi |
+|--------|----------|-----------|
+| `GET` | `/stats` | Statistik dashboard admin |
+| `GET/PUT/DELETE` | `/users` | Kelola pengguna |
+| `GET/PUT` | `/claims` | Kelola klaim |
+| `GET/PUT` | `/policies` | Kelola polis |
+| `GET` | `/transactions` | Daftar transaksi |
+| `GET/POST/PUT/DELETE` | `/hospitals` | CRUD rumah sakit |
+| `GET/POST/PUT/DELETE` | `/doctors` | CRUD dokter |
+| `GET/PUT` | `/consultations` | Kelola konsultasi |
+| `PUT` | `/feedbacks/{id}/featured` | Tampilkan/sembunyikan testimonial |
+| `GET/POST/PUT/DELETE` | `/packages` | CRUD paket asuransi |
+| `GET/POST/PUT/DELETE` | `/promotions` | CRUD promo banner |
+| `GET/POST/PUT/DELETE` | `/announcements` | CRUD informasi/pengumuman |
+| `GET/POST/PUT/DELETE` | `/promo-codes` | CRUD kode promo pembayaran |
+
+---
 
 ## 📝 Changelog
+
+### v2.2.0 · Promo, Admin & UX (Mei 2026)
+- ✅ **Program Referral** — kode unik, apply kode teman, kupon diskon otomatis
+- ✅ **Banner Carousel** — gabungan promo + informasi di dashboard (Halodoc-style)
+- ✅ **Kode Promo Pembayaran** — admin CRUD, validasi per fitur, input di checkout
+- ✅ **Admin: Promo, Informasi, Kode Promo** — upload gambar, atur diskon & syarat
+- ✅ **Testimonial Homepage** — feedback `is_featured` disetujui admin
+- ✅ **Halaman Promo** (`/promo`) — referral, carousel, info program
+- ✅ **Tentang Kami** — diperbarui dengan fitur, tim, dan tech stack terkini
+- ✅ **Footer fungsional** — Peta Situs, Aksesibilitas, Kebijakan Cookie
+- ✅ **Paket asuransi** — status aktif/nonaktif dikelola admin
 
 ### v2.1.0 · Penyempurnaan (Mei 2026)
 - ✅ **Pendaftaran Layanan Kesehatan** — modul baru (MCU, Lab, Fisioterapi, dll.)
