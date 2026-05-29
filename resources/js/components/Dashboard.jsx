@@ -24,6 +24,7 @@ import AccessibilityPanel from "./AccessibilityPanel";
 import { useAccessibility } from "./useAccessibility";
 import ChatNotifToast from "./ChatNotifToast";
 import { useChatNotif } from "./useChatNotif";
+import { resolveMediaUrl } from "../utils/mediaUrl";
 import axios from "axios";
 import {
   Menu,
@@ -205,6 +206,8 @@ export default function Home({ user, profile, onLogout }) {
     }
     return name.substring(0, 2).toUpperCase();
   };
+
+  const profilePhotoUrl = resolveMediaUrl(user?.profile_picture);
 
   const menuItems = [
     {
@@ -405,10 +408,10 @@ export default function Home({ user, profile, onLogout }) {
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
                 className="focus:outline-none group"
               >
-                {user?.profile_picture && user.profile_picture !== '' ? (
+                {profilePhotoUrl ? (
                   <div className="relative">
                     <img 
-                      src={user.profile_picture} 
+                      src={profilePhotoUrl} 
                       alt="Profile" 
                       className="w-11 h-11 rounded-full object-cover border-2 border-white shadow-lg group-hover:scale-105 transition-transform duration-300" 
                       onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
@@ -570,6 +573,11 @@ export default function Home({ user, profile, onLogout }) {
                               </div>
                               {dashboardData.policy.end_date && (
                                 <div className="text-xs text-gray-500">Berlaku s/d {dashboardData.policy.end_date}</div>
+                              )}
+                              {dashboardData.policy.active_count > 1 && (
+                                <div className="text-xs text-cyan-600 font-medium">
+                                  {dashboardData.policy.active_count} polis aktif
+                                </div>
                               )}
                             </>
                           ) : (
@@ -941,15 +949,15 @@ export default function Home({ user, profile, onLogout }) {
 
           {/* User Info */}
           <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl">
-            {user?.profile_picture && user.profile_picture !== '' ? (
+            {profilePhotoUrl ? (
               <img 
-                src={user.profile_picture} 
+                src={profilePhotoUrl} 
                 alt="Profile" 
                 className="w-12 h-12 rounded-full object-cover border-2 border-white shadow"
                 onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
               />
             ) : null}
-            {(!user?.profile_picture || user.profile_picture === '') && (
+            {!profilePhotoUrl && (
               <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold shadow">
                 {getInitials(user?.name)}
               </div>

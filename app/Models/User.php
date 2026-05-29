@@ -23,7 +23,52 @@ class User extends Authenticatable
         'password',
         'role',
         'referral_code',
+        'profile_picture',
     ];
+
+    public function setProfilePictureAttribute(?string $value): void
+    {
+        if (! $value) {
+            $this->attributes['profile_picture'] = null;
+
+            return;
+        }
+
+        if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://')) {
+            $path = parse_url($value, PHP_URL_PATH) ?: '';
+            $this->attributes['profile_picture'] = ltrim($path, '/');
+
+            return;
+        }
+
+        $this->attributes['profile_picture'] = ltrim($value, '/');
+    }
+
+    public function getProfilePictureAttribute(?string $value): ?string
+    {
+        if (! $value) {
+            return null;
+        }
+
+        if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://')) {
+            $path = parse_url($value, PHP_URL_PATH) ?: '';
+
+            return $this->buildPublicUrl($path);
+        }
+
+        return $this->buildPublicUrl('/' . ltrim($value, '/'));
+    }
+
+    private function buildPublicUrl(string $path): string
+    {
+        $path = '/' . ltrim($path, '/');
+
+        if (app()->runningInConsole() && ! app()->runningUnitTests()) {
+            return rtrim(config('app.url'), '/') . $path;
+        }
+
+        return request()->getSchemeAndHttpHost() . $path;
+    }
 
     public function referralsMade(): HasMany
     {

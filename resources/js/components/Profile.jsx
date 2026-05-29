@@ -1,7 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { User, Mail, MapPin, Calendar, Camera, Upload, ShieldCheck, Save, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { resolveMediaUrl } from '../utils/mediaUrl';
 
 export default function Profile({ user, profile, onUpdate }) {
   const navigate = useNavigate();
@@ -21,6 +22,15 @@ export default function Profile({ user, profile, onUpdate }) {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [avatarError, setAvatarError] = useState(false);
+
+  const profilePhotoSrc = profilePictureFile
+    ? URL.createObjectURL(profilePictureFile)
+    : resolveMediaUrl(user?.profile_picture);
+
+  useEffect(() => {
+    setAvatarError(false);
+  }, [user?.profile_picture, profilePictureFile]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -162,14 +172,17 @@ export default function Profile({ user, profile, onUpdate }) {
                 ref={profilePictureInputRef} 
                 className="hidden" 
                 accept=".jpg,.jpeg,.png" 
-                onChange={(e) => setProfilePictureFile(e.target.files[0])}
+                onChange={(e) => {
+                  setProfilePictureFile(e.target.files[0]);
+                  setAvatarError(false);
+                }}
               />
-              {profilePictureFile || (user?.profile_picture && user.profile_picture !== '') ? (
+              {profilePhotoSrc && !avatarError ? (
                 <img
-                  src={profilePictureFile ? URL.createObjectURL(profilePictureFile) : user.profile_picture}
+                  src={profilePhotoSrc}
                   alt="Foto profil"
                   className="w-32 h-32 rounded-[24px] object-cover border-[6px] border-white shadow-[0_20px_50px_-18px_rgba(79,70,229,0.45)] transition duration-500 group-hover:scale-[1.02]"
-                  onError={(e) => { e.target.style.display = 'none'; }}
+                  onError={() => setAvatarError(true)}
                 />
               ) : (
                 <div className="w-32 h-32 rounded-[24px] bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-500 flex items-center justify-center text-white font-black text-3xl shadow-[0_20px_50px_-18px_rgba(79,70,229,0.5)] border-[6px] border-white relative overflow-hidden animate-[float_5s_ease-in-out_infinite]">

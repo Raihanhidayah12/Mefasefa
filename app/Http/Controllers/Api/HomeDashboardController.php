@@ -30,20 +30,23 @@ class HomeDashboardController extends Controller
             }
         }
 
-        // ── 1. POLIS AKTIF USER ──────────────────────────────────────────
-        $policy = InsurancePolicy::where('user_id', $user->id)
+        // ── 1. SEMUA POLIS AKTIF USER (sama seperti halaman Monitor) ─────
+        $activePolicies = InsurancePolicy::where('user_id', $user->id)
             ->where('status', 'active')
-            ->latest()
-            ->first();
+            ->with('claims')
+            ->get();
 
-        // ── 2. SALDO / COVERAGE ──────────────────────────────────────────
-        $coverageLimit   = $policy?->coverage_limit ?? 0;
-        $totalClaimUsed  = Claim::where('user_id', $user->id)
-            ->whereIn('status', ['approved', 'partial'])
-            ->sum('claim_amount');
+        // Polis terbaru untuk info kartu (nomor polis, tanggal berlaku)
+        $policy = $activePolicies->sortByDesc('created_at')->first();
+
+        // ── 2. SALDO / COVERAGE (jumlahkan semua polis aktif) ────────────
+        $coverageLimit = $activePolicies->sum(fn ($p) => $p->coverage_limit ?? 0);
+        $totalClaimUsed = $activePolicies->sum(function ($p) {
+            return $p->claims->whereIn('status', ['approved', 'partial'])->sum('claim_amount');
+        });
         $remainingBalance = max(0, $coverageLimit - $totalClaimUsed);
         $usagePercent     = $coverageLimit > 0
-            ? min(100, round(($totalClaimUsed / $coverageLimit) * 100))
+            ? min(100, round(($totalClaimUsed / $coverageLimit) * 100, 2))
             : 0;
 
         // ── 3. PERBANDINGAN BULAN INI VS BULAN LALU ──────────────────────
@@ -70,8 +73,8 @@ class HomeDashboardController extends Controller
         }
 
         // ── 4. STATS CARD ────────────────────────────────────────────────
-        // Perlindungan: aktif = 100%, tidak aktif = 0%
-        $perlindungan = $policy && $policy->status === 'active' ? '100%' : '0%';
+        // Perlindungan: ada polis aktif = 100%, tidak ada = 0%
+        $perlindungan = $activePolicies->isNotEmpty() ? '100%' : '0%';
 
         // Klaim disetujui: persentase approved dari semua klaim user
         $totalClaims    = Claim::where('user_id', $user->id)->count();
@@ -120,6 +123,7 @@ class HomeDashboardController extends Controller
                     'end_date'       => $policy->end_date
                         ? Carbon::parse($policy->end_date)->translatedFormat('M Y')
                         : null,
+                    'active_count'   => $activePolicies->count(),
                 ] : null,
 
                 'balance' => [

@@ -28,7 +28,7 @@ class FeedbackController extends Controller
                     'cta_label' => $cta['label'],
                     'cta_url' => $cta['url'],
                     'user_name' => $feedback->user?->name ?? 'Pengguna MefaSafe',
-                    'user_avatar' => $feedback->user?->profile_picture,
+                    'user_avatar' => $feedback->user?->profile_picture ?: null,
                     'created_at' => $feedback->created_at,
                 ];
             });

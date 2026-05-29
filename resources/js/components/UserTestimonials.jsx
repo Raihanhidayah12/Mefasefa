@@ -1,6 +1,36 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { Loader2, Quote } from "lucide-react";
+import { resolveMediaUrl } from "../utils/mediaUrl";
+
+function TestimonialAvatar({ src, name }) {
+  const [failed, setFailed] = useState(false);
+  const avatarSrc = resolveMediaUrl(src);
+
+  if (!avatarSrc || failed) {
+    const label = (name || "M")
+      .split(" ")
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-pink-400 to-rose-500 text-2xl font-black text-white">
+        {label}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={avatarSrc}
+      alt={name}
+      className="h-full w-full object-cover"
+      onError={() => setFailed(true)}
+    />
+  );
+}
 
 export default function UserTestimonials({ onNavigate }) {
   const [items, setItems] = useState([]);
@@ -23,14 +53,6 @@ export default function UserTestimonials({ onNavigate }) {
 
   if (items.length === 0) return null;
 
-  const initials = (name) =>
-    (name || "M")
-      .split(" ")
-      .map((part) => part[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase();
-
   return (
     <section className="py-4">
       <div className="mb-8 text-center md:text-left">
@@ -46,13 +68,7 @@ export default function UserTestimonials({ onNavigate }) {
         {items.map((item) => (
           <article key={item.id} className="flex flex-col items-center text-center">
             <div className="mb-5 h-24 w-24 overflow-hidden rounded-full border-4 border-pink-100 bg-pink-50 shadow-sm">
-              {item.user_avatar ? (
-                <img src={item.user_avatar} alt={item.user_name} className="h-full w-full object-cover" />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-pink-400 to-rose-500 text-2xl font-black text-white">
-                  {initials(item.user_name)}
-                </div>
-              )}
+              <TestimonialAvatar src={item.user_avatar} name={item.user_name} />
             </div>
 
             <Quote className="mb-2 h-5 w-5 text-pink-300" />

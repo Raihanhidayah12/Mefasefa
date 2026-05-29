@@ -30,6 +30,7 @@ class AdminController extends Controller
     public function stats(): JsonResponse
     {
         $totalUsers        = User::where('role', 'pengguna')->count();
+        $totalAdmins       = User::where('role', 'admin')->count();
         $totalPolicies     = InsurancePolicy::count();
         $activePolicies    = InsurancePolicy::where('status', 'active')->count();
         $pendingClaims     = Claim::where('status', 'pending')->count();
@@ -111,6 +112,7 @@ class AdminController extends Controller
             'success' => true,
             'data' => [
                 'total_users'          => $totalUsers,
+                'total_admins'         => $totalAdmins,
                 'total_policies'       => $totalPolicies,
                 'active_policies'      => $activePolicies,
                 'pending_claims'       => $pendingClaims,
@@ -182,9 +184,110 @@ class AdminController extends Controller
     public function deleteUser(string $id): JsonResponse
     {
         $user = User::findOrFail($id);
+
+        if ($user->role === 'admin') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Hapus akun admin melalui menu Kelola Admin.',
+            ], 422);
+        }
+
         $user->delete();
 
         return response()->json(['success' => true, 'message' => 'User deleted.']);
+    }
+
+    // ─── ADMIN ACCOUNTS (role: admin) ────────────────────────────────────────
+
+    public function admins(Request $request): JsonResponse
+    {
+        $query = User::where('role', 'admin')
+            ->when($request->search, fn ($q) => $q->where(function ($inner) use ($request) {
+                $inner->where('name', 'like', "%{$request->search}%")
+                    ->orWhere('email', 'like', "%{$request->search}%");
+            }))
+            ->latest();
+
+        return response()->json([
+            'success' => true,
+            'data' => $query->paginate($request->per_page ?? 12),
+        ]);
+    }
+
+    public function storeAdmin(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email:rfc,dns', 'max:255', 'unique:users,email'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $admin = User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => $validated['password'],
+            'role' => 'admin',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Admin berhasil ditambahkan.',
+            'data' => $admin,
+        ], 201);
+    }
+
+    public function updateAdmin(Request $request, string $id): JsonResponse
+    {
+        $admin = User::where('role', 'admin')->findOrFail($id);
+
+        $rules = [
+            'name' => ['sometimes', 'string', 'max:255'],
+            'email' => ['sometimes', 'email:rfc,dns', 'max:255', 'unique:users,email,' . $admin->id],
+        ];
+
+        if ($request->filled('password')) {
+            $rules['password'] = ['required', 'string', 'min:8', 'confirmed'];
+        }
+
+        $validated = $request->validate($rules);
+
+        if (isset($validated['password'])) {
+            $validated['password'] = Hash::make($validated['password']);
+        }
+
+        $admin->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Data admin diperbarui.',
+            'data' => $admin->fresh(),
+        ]);
+    }
+
+    public function deleteAdmin(Request $request, string $id): JsonResponse
+    {
+        $admin = User::where('role', 'admin')->findOrFail($id);
+
+        if ($request->user() && (int) $request->user()->id === (int) $admin->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak dapat menghapus akun admin yang sedang login.',
+            ], 422);
+        }
+
+        if (User::where('role', 'admin')->count() <= 1) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak dapat menghapus admin terakhir.',
+            ], 422);
+        }
+
+        $admin->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Admin berhasil dihapus.',
+        ]);
     }
 
     // ─── CLAIMS ──────────────────────────────────────────────────────────────

@@ -106,6 +106,11 @@ Route::prefix('v1')->group(function (): void {
         Route::put('/users/{id}', [AdminController::class, 'updateUser']);
         Route::delete('/users/{id}', [AdminController::class, 'deleteUser']);
 
+        Route::get('/admins', [AdminController::class, 'admins']);
+        Route::post('/admins', [AdminController::class, 'storeAdmin']);
+        Route::put('/admins/{id}', [AdminController::class, 'updateAdmin']);
+        Route::delete('/admins/{id}', [AdminController::class, 'deleteAdmin']);
+
         // Claims
         Route::get('/claims', [AdminController::class, 'claims']);
         Route::put('/claims/{id}', [AdminController::class, 'updateClaim']);

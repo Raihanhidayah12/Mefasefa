@@ -1,11 +1,13 @@
 // resources/js/components/App.jsx
 import React from 'react';
+import axios from 'axios';
 import Dashboard from './Dashboard';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Profile from './Profile';
 import Login from './Login';
 import Register from './Register';
 import TermAgreement from './TermAgreement';
+import { resolveMediaUrl } from '../utils/mediaUrl';
 
 export default function App() {
     const [screen, setScreen] = React.useState('login');
@@ -18,14 +20,39 @@ export default function App() {
         const savedProfile = localStorage.getItem('mefasafe_profile');
 
         if (savedToken && savedUser) {
-            setUser(JSON.parse(savedUser));
-            setProfile(savedProfile ? JSON.parse(savedProfile) : null);
+            const parsedUser = JSON.parse(savedUser);
+            const parsedProfile = savedProfile ? JSON.parse(savedProfile) : null;
+
+            setUser(parsedUser);
+            setProfile(parsedProfile);
             setScreen('dashboard');
+
+            // Refresh data user agar URL foto profil selalu sesuai host saat ini
+            axios
+                .get(`/api/v1/users/${parsedUser.id}`, {
+                    headers: { Authorization: `Bearer ${savedToken}` },
+                })
+                .then((res) => {
+                    const freshUser = res.data?.data;
+                    if (!freshUser) return;
+
+                    setUser(freshUser);
+                    setProfile(freshUser.profile ?? parsedProfile);
+                    localStorage.setItem('mefasafe_user', JSON.stringify(freshUser));
+                    if (freshUser.profile) {
+                        localStorage.setItem('mefasafe_profile', JSON.stringify(freshUser.profile));
+                    }
+                })
+                .catch(() => {});
         }
     }, []);
 
     const handleAuthSuccess = (nextUser, nextProfile) => {
-        setUser(nextUser);
+        const normalizedUser = nextUser
+            ? { ...nextUser, profile_picture: resolveMediaUrl(nextUser.profile_picture) ?? nextUser.profile_picture }
+            : nextUser;
+
+        setUser(normalizedUser);
         setProfile(nextProfile);
         setScreen('dashboard');
     };

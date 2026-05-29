@@ -112,7 +112,7 @@ class UserController extends Controller
             }
 
             if ($request->hasFile('profile_picture')) {
-                $user->profile_picture = asset($this->uploadFile($request->file('profile_picture'), 'profiles'));
+                $user->profile_picture = $this->uploadFile($request->file('profile_picture'), 'profiles');
             }
 
             $user->save();

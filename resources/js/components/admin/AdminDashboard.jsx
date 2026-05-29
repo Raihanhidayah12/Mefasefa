@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import AdminOverview    from "./sections/AdminOverview";
 import AdminUsers       from "./sections/AdminUsers";
+import AdminAdmins      from "./sections/AdminAdmins";
 import AdminPolicies    from "./sections/AdminPolicies";
 import AdminClaims      from "./sections/AdminClaims";
 import AdminTransactions from "./sections/AdminTransactions";
@@ -25,6 +26,7 @@ import { useChatNotif } from "../useChatNotif";
 const NAV = [
     { id: "overview",       label: "Overview",          icon: LayoutDashboard },
     { id: "users",          label: "Pengguna",           icon: Users },
+    { id: "admins",         label: "Kelola Admin",       icon: Shield },
     { id: "policies",       label: "Polis Asuransi",     icon: Shield },
     { id: "claims",         label: "Klaim",              icon: FileText },
     { id: "transactions",   label: "Transaksi",          icon: CreditCard },
@@ -95,6 +97,7 @@ export default function AdminDashboard({ admin, onLogout }) {
     const navBadges = useMemo(() => ({
         overview: stats?.pending_payments || 0,
         users: stats?.total_users || 0,
+        admins: stats?.total_admins || 0,
         policies: stats?.pending_policies || stats?.total_policies || 0,
         claims: stats?.pending_claims || 0,
         transactions: stats?.pending_transactions || 0,
@@ -120,6 +123,7 @@ export default function AdminDashboard({ admin, onLogout }) {
     const ActiveSection = {
         overview:      AdminOverview,
         users:         AdminUsers,
+        admins:        AdminAdmins,
         policies:      AdminPolicies,
         claims:        AdminClaims,
         transactions:  AdminTransactions,
@@ -264,7 +268,11 @@ export default function AdminDashboard({ admin, onLogout }) {
                 {/* Content */}
                 <main className="flex-1 overflow-y-auto p-4 lg:p-7">
                     <div className="mx-auto max-w-[1600px]">
-                        <ActiveSection />
+                        {active === "admins" ? (
+                            <AdminAdmins currentAdminId={admin?.id} />
+                        ) : (
+                            <ActiveSection />
+                        )}
                     </div>
                     {/* Chat notification toasts */}
                     <ChatNotifToast
